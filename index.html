@@ -258,15 +258,15 @@
 
 
     .btn-generate{
-      border:1px solid #1f7a5a;
+      border:1px solid #c62828;
       color:#fff;
-      background:#1f7a5a;
+      background:#c62828;
       padding:10px 14px;
       border-radius:999px;
       cursor:pointer;
       font-weight:700;
     }
-    .btn-generate:hover{background:#19664b;border-color:#19664b}
+    .btn-generate:hover{background:#b71c1c;border-color:#b71c1c}
     .btn-generate:disabled{
       opacity:.55;
       cursor:not-allowed;
@@ -1098,7 +1098,7 @@
           <input id="fileInput" type="file" accept=".doc,.docx" hidden />
           <span class="file-name" id="fileName">Sin archivo cargado</span>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><button id="historyBtn" class="btn-history" type="button">Historial de informes</button><button id="loadVersionBtn" class="btn-load-version" type="button">Importar informe</button><button id="saveVersionBtn" class="btn-save-version" type="button" disabled>Guardar informe</button><button id="generatePdfBtn" class="btn-generate" type="button" disabled>Generar informe PDF</button><input id="loadVersionInput" type="file" accept=".json" hidden></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;justify-content:flex-end;"><button id="historyBtn" class="btn-history" type="button">Historial de informes</button><button id="loadVersionBtn" class="btn-load-version" type="button">Importar proyecto</button><button id="saveVersionBtn" class="btn-save-version" type="button" disabled>Guardar proyecto</button><button id="generatePdfBtn" class="btn-generate" type="button" disabled style="margin-left:auto;">Generar informe PDF</button><input id="loadVersionInput" type="file" accept=".json" hidden></div>
       </div>
 
       <div class="radio-group">
@@ -1125,7 +1125,7 @@
 
     <div id="versionsPanel" class="versions-panel" style="display:none;">
       <div class="versions-head">
-        <div><div class="versions-title">Historial de informes</div><div class="version-meta">Aquí aparecen las informes guardadas en este navegador. El botón Importar informe sirve para abrir un archivo que hayas descargado antes, normalmente desde Descargas.</div></div>
+        <div><div class="versions-title">Historial de informes</div><div class="version-meta">Aquí aparecen las informes guardadas en este navegador. El botón Importar proyecto sirve para abrir un archivo que hayas descargado antes, normalmente desde Descargas.</div></div>
         <div class="versions-actions">
           <button id="clearVersionsBtn" class="btn-clear-versions" type="button">Borrar historial</button>
         </div>
@@ -3201,9 +3201,13 @@ async function generateCoverPdf() {
       doc.addImage(criterionLogo.dataUrl, 'PNG', logoX, logoY, fitHighlighted.w, fitHighlighted.h);
 
       doc.setFont('times', 'bold');
-      doc.setFontSize(28);
+      doc.setFontSize(24);
       doc.setTextColor(...selectedCriterionColor);
-      doc.text(selectedCriterionName, pageW / 2, logoY + fitHighlighted.h + 20, { align: 'center' });
+      const highlightedTitleLines = doc.splitTextToSize(selectedCriterionName, 150);
+      doc.text(highlightedTitleLines, pageW / 2, logoY + fitHighlighted.h + 20, {
+        align: 'center',
+        baseline: 'top'
+      });
     }
   }
 
@@ -3215,92 +3219,6 @@ async function generateCoverPdf() {
 
   function addContinuationParagraph(state, text, opts={}) {
     return addParagraph(state, normalizePdfParagraph(text), opts);
-  }
-
-  function addPlainContinuationParagraph(state, text, opts={}) {
-    const maxWidth = pageW - margin * 2;
-    const lines = doc.splitTextToSize(normalizePdfParagraph(text), maxWidth);
-    doc.setFont('times', opts.bold ? 'bold' : 'normal');
-    doc.setFontSize(11.5);
-    doc.setTextColor(40, 40, 40);
-    doc.text(lines, margin, state.y);
-    state.y += lines.length * 5.8;
-    state.y += (opts.after || 5);
-    return state;
-  }
-
-  function addContinuationRichLine(state, segments, opts={}) {
-    let x = margin;
-    doc.setFontSize(11.5);
-    doc.setTextColor(40, 40, 40);
-    segments.forEach(segment => {
-      const text = String(segment.text || '');
-      doc.setFont('times', segment.bold ? 'bold' : 'normal');
-      doc.text(text, x, state.y);
-      x += doc.getTextWidth(text);
-    });
-    state.y += 5.8 + (opts.after || 5);
-    return state;
-  }
-
-  function richWordsFromSegments(segments) {
-    return segments.flatMap(segment => {
-      const text = normalizePdfParagraph(segment.text);
-      if (!text) return [];
-      return text.split(' ').map(word => ({ text: word, bold: !!segment.bold }));
-    });
-  }
-
-  function richWordWidth(word) {
-    doc.setFont('times', word.bold ? 'bold' : 'normal');
-    doc.setFontSize(11.5);
-    return doc.getTextWidth(word.text);
-  }
-
-  function addContinuationRichParagraph(state, segments, opts={}) {
-    const maxWidth = pageW - margin * 2;
-    const spaceW = doc.getTextWidth(' ');
-    const lines = [];
-    let currentLine = [];
-    let currentWidth = 0;
-
-    richWordsFromSegments(segments).forEach(word => {
-      const wordW = richWordWidth(word);
-      const separatorW = currentLine.length ? spaceW : 0;
-
-      if (currentLine.length && currentWidth + separatorW + wordW > maxWidth) {
-        lines.push({ words: currentLine, width: currentWidth });
-        currentLine = [word];
-        currentWidth = wordW;
-      } else {
-        currentLine.push(word);
-        currentWidth += separatorW + wordW;
-      }
-    });
-
-    if (currentLine.length) lines.push({ words: currentLine, width: currentWidth });
-
-    lines.forEach((line, lineIndex) => {
-      const isLastLine = lineIndex === lines.length - 1;
-      const gaps = Math.max(0, line.words.length - 1);
-      const rawJustifiedSpaceW = gaps ? (maxWidth - line.words.reduce((sum, word) => sum + richWordWidth(word), 0)) / gaps : spaceW;
-      const justifiedSpaceW = (!isLastLine && rawJustifiedSpaceW <= spaceW * 2.4) ? rawJustifiedSpaceW : spaceW;
-      let x = margin;
-
-      line.words.forEach((word, wordIndex) => {
-        doc.setFont('times', word.bold ? 'bold' : 'normal');
-        doc.setFontSize(11.5);
-        doc.setTextColor(40, 40, 40);
-        doc.text(word.text, x, state.y);
-        x += richWordWidth(word);
-        if (wordIndex < line.words.length - 1) x += justifiedSpaceW;
-      });
-
-      state.y += 5.8;
-    });
-
-    state.y += (opts.after || 5);
-    return state;
   }
 
   function addBeltIaBoldParagraph(state) {
