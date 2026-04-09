@@ -1,0 +1,4102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gestor de informes</title>
+  <!-- Carga preferente de librerías locales para trabajo sin red. -->
+  <script>
+    (function () {
+      function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+          const script = document.createElement('script');
+          script.src = src;
+          script.async = false;
+          script.onload = function () { resolve(src); };
+          script.onerror = function () { reject(new Error('No se pudo cargar ' + src)); };
+          document.head.appendChild(script);
+        });
+      }
+
+      async function loadLibrary(options) {
+        for (const src of options.sources) {
+          try {
+            await loadScript(src);
+            if (options.test()) return src;
+          } catch (e) {}
+        }
+        throw new Error(options.errorMessage);
+      }
+
+      window.CCVG_LIBS_READY = (async function () {
+        await loadLibrary({
+          test: function () { return typeof window.JSZip !== 'undefined'; },
+          sources: [
+            'libs/jszip.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+          ],
+          errorMessage: 'No se ha podido cargar JSZip. Copia "jszip.min.js" en la carpeta "libs" para trabajar en local sin red.'
+        });
+
+        await loadLibrary({
+          test: function () { return !!(window.jspdf && window.jspdf.jsPDF); },
+          sources: [
+            'libs/jspdf.umd.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+          ],
+          errorMessage: 'No se ha podido cargar jsPDF. Copia "jspdf.umd.min.js" en la carpeta "libs" para generar el PDF en local.'
+        });
+      })();
+    })();
+  </script>
+  <style>
+    :root{
+      --morado:#84329e;
+      --rosa:#d592aa;
+      --texto:#67809f;
+      --fondo:#f7f7fb;
+      --borde:#e2e2ee;
+      --ok:#2e7d32;
+      --bad:#c62828;
+      --warn:#ef6c00;
+      --card:#ffffff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,sans-serif;background:var(--fondo);color:#222}
+    .app-header{
+      display:flex;align-items:center;justify-content:space-between;gap:20px;
+      padding:16px 28px;background:#fff;border-bottom:2px solid var(--borde)
+    }
+    .app-header img{display:block;max-height:70px;height:auto;width:auto;object-fit:contain}
+    .app-header-left,.app-header-right{flex:0 0 240px;display:flex;align-items:center}
+    .app-header-left{justify-content:flex-start}
+    .app-header-right{justify-content:flex-end;gap:10px}
+    .app-header-center{flex:1;text-align:center}
+    .app-header-title{font-size:30px;font-weight:700;color:#222;line-height:1.1;margin-bottom:6px}
+    .app-header-subtitle{font-size:16px;color:#555;line-height:1.25}
+    .se-label{font-size:13px;color:#444;line-height:1.2;text-align:right}
+
+    .page{max-width:1150px;margin:0 auto;padding:24px}
+    h1,h2,h3,h4,h5{color:var(--texto);margin:0 0 10px;line-height:1.3}
+
+    .toolbar,.summary,.criterion,.standard-card,.panel{
+      background:var(--card);
+      border:1px solid var(--borde);
+      border-radius:12px;
+      box-shadow:0 1px 3px rgba(0,0,0,.06);
+    }
+    .toolbar{padding:16px;margin-bottom:18px;display:grid;gap:14px}
+    .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+    .btn{
+      border:1px solid var(--morado);color:var(--morado);background:#fff;
+      padding:10px 14px;border-radius:999px;cursor:pointer;font-weight:600
+    }
+    .btn:hover{background:#faf6fc}
+    .file-name,.muted{color:#666}
+    .title{font-size:2rem;font-weight:700;margin-bottom:14px}
+    .report-title-block{margin-bottom:18px;text-align:center}
+    .report-main-title{font-size:32px;font-weight:700;color:#222;line-height:1.15}
+    .report-applicant{font-size:16px;font-weight:600;color:#444;line-height:1.35;margin-top:6px}
+    .report-code{font-size:14px;color:#777;line-height:1.3;margin-top:4px}
+
+    .radio-group{display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+
+    .summary{padding:16px;margin-bottom:18px}
+    .stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+    .chip{background:#f3eef6;color:#5d2a70;padding:6px 10px;border-radius:999px;font-size:.85rem;font-weight:600}
+    .criteria-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+    .mini-card{background:#fbfbfe;border:1px solid #ececf3;border-radius:10px;padding:10px}
+    .mini-card.level-ok{background:#eef8ef;border-color:#cfe8d1}
+    .mini-card.level-warn{background:#fff6ea;border-color:#f2d2a4}
+    .mini-card.level-bad{background:#fdeeee;border-color:#efc3c3}
+    .mini-card-title{font-weight:700;font-size:15px;margin-bottom:4px}
+    .mini-card-no-cumple{font-weight:700}
+    .mini-card-no-cumple.level-ok{color:#2e7d32}
+    .mini-card-no-cumple.level-warn{color:#ef6c00}
+    .mini-card-no-cumple.level-bad{color:#c62828}
+
+    .criterion{margin-bottom:22px;overflow:hidden}
+    .criterion-head{min-height:70px;background:var(--rosa);display:flex;align-items:center;padding:0 16px}
+    .criterion-body{padding:16px}
+    .standard-card{margin:18px 0 24px;border:3px solid var(--rosa);padding:16px}
+    .standard-title-line,.eo-title-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .standard-heading{display:inline;margin:0}
+    .standard-description,.eo-text{margin-top:4px}
+    .eo-code{font-weight:700}
+    .badge{
+      display:inline-block;padding:4px 10px;border-radius:999px;color:#fff;
+      font-size:.82rem;font-weight:700;vertical-align:middle;margin-left:0;
+      white-space:nowrap; line-height:1.1;
+    }
+    .badge.esencial,.badge.imprescindible{background:#1976d2}
+    .badge.no-cumple{background:var(--bad)}
+    .badge.cumple{background:var(--ok)}
+    .badge.parcial{background:var(--warn)}
+    table{width:100%;border-collapse:collapse;margin:14px 0 16px}
+    th{text-align:left;background:#eaeaea;color:var(--texto);padding:10px}
+    td{padding:10px;border-top:1px solid #ececf3;vertical-align:top}
+    .section-title{margin-top:12px;margin-bottom:8px;font-size:1.12rem;color:var(--texto)}
+    .eo-item{border-top:1px dashed #ddd;padding-top:12px;margin-top:12px}
+    .small{font-size:.92rem}
+    .placeholder{padding:24px;text-align:center}
+    .report-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}
+
+    @media (max-width: 900px){
+      .app-header{padding:14px 16px;gap:10px}
+      .app-header-left,.app-header-right{flex:0 0 110px}
+      .app-header img{max-height:56px;max-width:100%}
+      .app-header-title{font-size:24px}
+      .app-header-subtitle{font-size:14px}
+      .page{padding:14px}
+      .se-label{font-size:11px}
+    }
+  
+.criterion-head{color:#fff;font-weight:700;cursor:pointer;user-select:none}
+.criterion-head h3{color:#fff;}
+.criterion.collapsed .criterion-body{display:none;}
+.criterion-head::after{content:'−';margin-left:auto;font-size:24px;font-weight:700;color:#fff;}
+.criterion.collapsed .criterion-head::after{content:'+';}
+.criterion-head.c1{background:#c48aa0;}
+.criterion-head.c2{background:#b39acb;}
+.criterion-head.c3{background:#7d3c98;}
+.criterion-head.c4{background:#4b2e83;}
+.criterion-head.c5{background:#e3062f;}
+.criterion-head.c6{background:#e85a5a;}
+
+
+.mini-card.c1{background:#c48aa0;color:#fff;} .mini-card.c1 *{color:#fff;}
+.mini-card.c2{background:#b39acb;color:#fff;} .mini-card.c2 *{color:#fff;}
+.mini-card.c3{background:#7d3c98;color:#fff;} .mini-card.c3 *{color:#fff;}
+.mini-card.c4{background:#4b2e83;color:#fff;} .mini-card.c4 *{color:#fff;}
+.mini-card.c5{background:#e3062f;color:#fff;} .mini-card.c5 *{color:#fff;}
+.mini-card.c6{background:#e85a5a;color:#fff;} .mini-card.c6 *{color:#fff;}
+
+
+.mini-card-title{
+  font-weight:800;
+  font-size:16px;
+  margin-bottom:6px;
+}
+
+.mini-card .muted{
+  color:rgba(255,255,255,0.85) !important;
+  font-weight:400;
+}
+
+.mini-card-no-cumple{
+  font-weight:600;
+  color:#fff !important;
+}
+
+
+    .login-overlay{
+      position:fixed; inset:0; background:rgba(20,20,30,.92);
+      display:flex; align-items:center; justify-content:center;
+      z-index:9999; padding:24px;
+    }
+    .login-card{
+      width:min(420px, 100%); background:#fff; border-radius:16px;
+      padding:28px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+      border:1px solid #ddd;
+    }
+    .login-card h2{color:#222; margin:0 0 8px}
+    .login-card p{margin:0 0 18px; color:#555}
+    .login-field{display:grid; gap:6px; margin-bottom:14px}
+    .login-field label{font-size:14px; color:#444; font-weight:600}
+    .login-field input{
+      width:100%; padding:11px 12px; border:1px solid #ccc;
+      border-radius:10px; font-size:15px;
+    }
+    .login-actions{display:flex; gap:10px; align-items:center; margin-top:6px}
+    .login-btn{
+      border:1px solid var(--morado); background:var(--morado); color:#fff;
+      padding:10px 16px; border-radius:999px; cursor:pointer; font-weight:700;
+    }
+    .login-remember{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin:4px 0 2px;
+      color:#444;
+      font-size:14px;
+      font-weight:600;
+      user-select:none;
+    }
+    .login-remember input{
+      width:16px;
+      height:16px;
+      accent-color:var(--morado);
+      margin:0;
+    }
+    .login-error{min-height:20px; color:#c62828; font-size:14px; margin-top:10px}
+    body.locked{overflow:hidden}
+    #appShell{display:none}
+
+
+.login-title{font-size:24px;font-weight:800;margin-bottom:6px;text-align:center}
+.login-subtitle{font-size:14px;color:#555;margin-bottom:16px;text-align:center}
+.password-wrap{position:relative}
+.password-wrap input{padding-right:40px}
+.toggle-pass{
+  position:absolute; right:10px; top:50%; transform:translateY(-50%);
+  cursor:pointer; font-size:14px; color:#666; user-select:none;
+}
+
+
+.notice-doc{
+  background:#fff7e6;
+  border:1px solid #f3cf8a;
+  color:#7a5b00;
+  border-radius:12px;
+  padding:14px 16px;
+  margin-top:12px;
+  line-height:1.45;
+}
+.notice-doc strong{color:#6b4f00}
+.notice-doc ol{margin:8px 0 0 18px; padding:0}
+.notice-doc li{margin:4px 0}
+
+
+    .btn-generate{
+      border:1px solid #1f7a5a;
+      color:#fff;
+      background:#1f7a5a;
+      padding:10px 14px;
+      border-radius:999px;
+      cursor:pointer;
+      font-weight:700;
+    }
+    .btn-generate:hover{background:#19664b;border-color:#19664b}
+    .btn-generate:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
+
+
+    .title-editor{
+      display:grid;
+      gap:10px;
+      max-width:760px;
+      margin:16px auto 0 auto;
+    }
+    .title-editor-row{
+      display:grid;
+      gap:6px;
+      text-align:left;
+    }
+    .title-editor-row label{
+      font-size:12px;
+      color:#666;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+    .title-editor-row input{
+      width:100%;
+      padding:11px 12px;
+      border:1px solid #d7d7e2;
+      border-radius:10px;
+      background:#fff;
+    }
+    .title-editor-row input.center-box{
+      font-size:16px;
+      font-weight:700;
+      color:#444;
+      text-transform:uppercase;
+    }
+    .title-editor-row input.code-box{
+      font-size:14px;
+      font-weight:700;
+      color:#777;
+    }
+
+
+  .btn-save-version{
+    border:1px solid #2563eb;
+    color:#fff;
+    background:#2563eb;
+    padding:10px 14px;
+    border-radius:999px;
+    cursor:pointer;
+    font-weight:700;
+  }
+  .btn-save-version:hover{background:#1d4ed8;border-color:#1d4ed8}
+
+  .btn-load-version{
+    border:1px solid #475569;
+    color:#fff;
+    background:#475569;
+    padding:10px 14px;
+    border-radius:999px;
+    cursor:pointer;
+    font-weight:700;
+  }
+  .btn-load-version:hover{background:#334155;border-color:#334155}
+  .versions-panel{
+    background:#fff;
+    border:1px solid var(--borde);
+    border-radius:12px;
+    padding:16px;
+    margin-top:16px;
+    display:none;
+  }
+  .versions-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .versions-title{
+    font-size:18px;
+    font-weight:700;
+    color:#333;
+  }
+  .versions-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .btn-clear-versions{
+    border:1px solid #b91c1c;
+    color:#fff;
+    background:#b91c1c;
+    padding:10px 14px;
+    border-radius:999px;
+    cursor:pointer;
+    font-weight:700;
+  }
+  .btn-clear-versions:hover{background:#991b1b;border-color:#991b1b}
+  .versions-list{
+    display:grid;
+    gap:10px;
+  }
+  .version-card{
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    padding:12px;
+    background:#fbfbfe;
+    display:grid;
+    gap:10px;
+  }
+  .version-card-top{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    align-items:flex-start;
+  }
+  .version-name{
+    font-size:16px;
+    font-weight:700;
+    color:#333;
+    text-transform:uppercase;
+  }
+  .version-meta{
+    font-size:13px;
+    color:#666;
+  }
+  .version-actions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .version-btn{
+    border:1px solid #d1d5db;
+    background:#fff;
+    color:#374151;
+    padding:8px 12px;
+    border-radius:999px;
+    cursor:pointer;
+    font-weight:700;
+  }
+  .version-btn:hover{background:#f3f4f6}
+  .version-empty{
+    color:#666;
+    font-size:14px;
+    padding:12px;
+    border:1px dashed #d1d5db;
+    border-radius:10px;
+    background:#fafafa;
+  }
+
+
+  .btn-history{
+    border:1px solid #7c3aed;
+    color:#fff;
+    background:#7c3aed;
+    padding:10px 14px;
+    border-radius:999px;
+    cursor:pointer;
+    font-weight:700;
+  }
+  .btn-history:hover{background:#6d28d9;border-color:#6d28d9}
+  .versions-panel{
+    display:none;
+  }
+
+  .current-version-note{
+    font-size:13px;
+    color:#666;
+    margin-top:2px;
+  }
+.standard-card{
+      border:none;
+      padding:0;
+      margin:12px 0 20px;
+      background:transparent;
+      box-shadow:none;
+    }
+    .standard-title-wrap{
+      border:1px solid var(--rosa);
+      padding:12px 16px;
+      margin-bottom:10px;
+      background:#fff;
+    }
+
+    .justification-input{
+      width:100%;
+      min-height:44px;
+      resize:vertical;
+      overflow-y:hidden;
+      padding:10px 12px;
+      border:1px solid #d7d7e2;
+      border-radius:8px;
+      font:inherit;
+      color:#333;
+      background:#fff;
+      line-height:1.4;
+      box-sizing:border-box;
+    }
+    .justification-input:focus{
+      outline:none;
+      border-color:#9b7ab3;
+      box-shadow:0 0 0 3px rgba(132,50,158,.12);
+    }
+
+
+    .eval-table{
+      width:100%;
+      table-layout:fixed;
+    }
+    .eval-table col.col-autoeval{width:17%;}
+    .eval-table col.col-evaluacion{width:17%;}
+    .eval-table col.col-justificacion{width:66%;}
+    .eval-table td, .eval-table th{
+      vertical-align:top;
+    }
+    .eval-table td:nth-child(2){
+      white-space:nowrap;
+    }
+
+
+    .standard-main-box{
+      background:#fcf7fa;
+      border:1px solid #ead3de;
+      border-radius:10px;
+      padding:12px;
+      margin-bottom:14px;
+    }
+
+
+
+  
+  .back-top{
+    position:fixed !important;
+    right:20px !important;
+    bottom:20px !important;
+    z-index:2147483647 !important;
+    border:1px solid #7c3aed !important;
+    background:#7c3aed !important;
+    color:#fff !important;
+    padding:10px 14px !important;
+    border-radius:999px !important;
+    cursor:pointer !important;
+    font-weight:700 !important;
+    box-shadow:0 4px 12px rgba(0,0,0,.25) !important;
+    display:block !important;
+    text-decoration:none !important;
+    user-select:none !important;
+  }
+  .back-top:hover{background:#6d28d9 !important;border-color:#6d28d9 !important;color:#fff !important}
+  html{scroll-behavior:smooth;}
+
+
+    .editable-list{
+      display:grid;
+      gap:10px;
+      margin:6px 0 0;
+    }
+    .editable-list-item{
+      width:100%;
+      min-height:44px;
+      resize:vertical;
+      overflow-y:hidden;
+      padding:10px 12px;
+      border:1px solid #d7d7e2;
+      border-radius:8px;
+      font:inherit;
+      color:#333;
+      background:#fff;
+      line-height:1.4;
+      box-sizing:border-box;
+    }
+    .editable-list-item:focus{
+      outline:none;
+      border-color:#9b7ab3;
+      box-shadow:0 0 0 3px rgba(132,50,158,.12);
+    }
+
+
+    .title-editor{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:14px 18px;
+      max-width:980px;
+      margin:16px auto 0 auto;
+      align-items:start;
+    }
+    .title-editor-col{
+      display:grid;
+      gap:10px;
+    }
+    @media (max-width: 900px){
+      .title-editor{grid-template-columns:1fr;}
+    }
+
+    .title-editor-row select{
+      width:100%;
+      padding:11px 12px;
+      border:1px solid #d7d7e2;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      color:#333;
+    }
+
+    .file-name{
+      display:inline-block;
+      max-width:320px;
+      white-space:normal;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+      line-height:1.2;
+    }
+
+
+    .top-panels{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:14px;
+      width:100%;
+      margin-top:8px;
+    }
+    .top-panel{
+      border:1px solid #c7b7e6;
+      border-radius:12px;
+      background:#fff;
+      overflow:hidden;
+      box-shadow:0 2px 8px rgba(124,58,237,.08);
+    }
+    .top-panel summary{
+      list-style:none;
+      cursor:pointer;
+      padding:12px 14px;
+      font-weight:700;
+      color:#fff;
+      background:linear-gradient(90deg, #b39ddb 0%, #9c89c8 100%);
+      border-bottom:1px solid #b7a6d8;
+      position:relative;
+    }
+    .top-panel summary::-webkit-details-marker{display:none;}
+    .top-panel summary::after{
+      content:'+';
+      position:absolute;
+      right:14px;
+      top:50%;
+      transform:translateY(-50%);
+      font-size:20px;
+      font-weight:700;
+      color:#fff;
+    }
+    .top-panel[open] summary::after{content:'−';}
+    .top-panel-body{
+      padding:14px;
+      display:grid;
+      gap:10px;
+    }
+    @media (max-width: 900px){
+      .top-panels{grid-template-columns:1fr;}
+    }
+
+
+    .label-highlight{
+      display:inline-block;
+      background:#7c3aed;
+      color:#fff !important;
+      font-weight:700 !important;
+      padding:4px 8px;
+      border-radius:8px;
+      letter-spacing:.01em;
+    }
+
+
+    .panel-status{
+      margin-top:8px;
+      font-size:12px;
+      font-weight:700;
+      color:#2e7d32;
+    }
+    .panel-status.pending{
+      color:#8a6d3b;
+      font-weight:600;
+    }
+
+
+    .summary-status{
+      display:inline-block;
+      margin-left:10px;
+      padding:2px 8px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      background:#e9f7ee;
+      color:#2e7d32;
+    }
+    .summary-status.pending{
+      background:#fff4df;
+      color:#8a6d3b;
+    }
+
+
+    .top-area{
+      display:grid;
+      grid-template-columns: 1.3fr .9fr;
+      gap:14px;
+      width:100%;
+    }
+    .date-panel{
+      border:1px solid #c7b7e6;
+      border-radius:12px;
+      background:#fff;
+      box-shadow:0 2px 8px rgba(124,58,237,.08);
+      overflow:hidden;
+    }
+    .date-panel-head{
+      padding:12px 14px;
+      font-weight:700;
+      color:#fff;
+      background:linear-gradient(90deg, #b39ddb 0%, #9c89c8 100%);
+      border-bottom:1px solid #b7a6d8;
+    }
+    .date-panel-body{
+      padding:14px;
+      display:grid;
+      gap:10px;
+    }
+    .title-editor-row input[type="date"]{
+      width:100%;
+      padding:11px 12px;
+      border:1px solid #d7d7e2;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      color:#333;
+    }
+    @media (max-width: 900px){
+      .top-area{grid-template-columns:1fr;}
+    }
+
+
+    .summary details{
+      border:1px solid var(--borde);
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .summary summary{
+      list-style:none;
+      cursor:pointer;
+      padding:14px 18px;
+      font-size:1.15rem;
+      font-weight:700;
+      color:#5f7ea7;
+      background:#f7f8fc;
+      position:relative;
+    }
+    .summary summary::-webkit-details-marker{display:none;}
+    .summary summary::after{
+      content:'+';
+      position:absolute;
+      right:18px;
+      top:50%;
+      transform:translateY(-50%);
+      font-size:24px;
+      color:#6b7280;
+    }
+    .summary details[open] summary::after{content:'−';}
+    .summary-content{
+      padding:18px;
+    }
+    .summary-total{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(220px, 1fr));
+      gap:12px;
+      margin-bottom:16px;
+    }
+    .summary-metric{
+      background:#f4eef8;
+      border:1px solid #e4d7ef;
+      border-radius:16px;
+      padding:12px 14px;
+      color:#5a2f78;
+    }
+    .summary-metric.ok{
+      background:#eaf7ee;
+      border-color:#cfe8d6;
+      color:#2f6a41;
+    }
+    .summary-metric.bad{
+      background:#fdeeee;
+      border-color:#f1c9c9;
+      color:#9a3b3b;
+    }
+    .summary-metric-title{
+      font-size:.95rem;
+      font-weight:700;
+      margin-bottom:6px;
+    }
+    .summary-metric-value{
+      font-size:1.5rem;
+      font-weight:800;
+      line-height:1;
+      margin-bottom:8px;
+    }
+    .summary-metric-breakdown{
+      display:grid;
+      gap:4px;
+      font-size:.92rem;
+      color:inherit;
+      opacity:.95;
+    }
+    .summary-metric-breakdown span{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .criteria-summary-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(320px, 1fr));
+      gap:14px;
+    }
+    .criterion-summary-card{
+      border-radius:18px;
+      padding:14px 18px 16px;
+      color:#4f4360;
+      box-shadow:0 1px 4px rgba(0,0,0,.06);
+      border:2px solid rgba(214,190,116,.75);
+    }
+    .criterion-summary-title{
+      font-size:1.05rem;
+      font-weight:800;
+      margin-bottom:10px;
+      line-height:1.2;
+      color:#4f4360;
+    }
+    .criterion-summary-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:0.98rem;
+      color:#4f4360;
+    }
+    .criterion-summary-table th,
+    .criterion-summary-table td{
+      padding:4px 8px 4px 0;
+      vertical-align:middle;
+      border-top:1px solid rgba(79,67,96,.18);
+    }
+    .criterion-summary-table thead th{
+      font-weight:800;
+      text-align:center;
+      white-space:nowrap;
+    }
+    .criterion-summary-table tbody td:first-child{
+      font-weight:400;
+      text-align:left;
+      white-space:nowrap;
+    }
+    .criterion-summary-table td:not(:first-child),
+    .criterion-summary-table th:not(:first-child){
+      text-align:center;
+      font-weight:400;
+      min-width:58px;
+    }
+    .criterion-summary-table tbody tr.row-total td{
+      font-weight:800;
+    }
+    .criterion-summary-table tbody tr.row-essential-alert td{
+      background:#8b1e2d;
+      color:#fff;
+      font-weight:800;
+      padding-left:8px;
+      padding-right:8px;
+      border-top:1px solid rgba(255,255,255,.25);
+    }
+    .highlight-criterion-panel{
+      border:2px solid #b88a2d;
+      border-radius:18px;
+      background:linear-gradient(135deg, #fff7df 0%, #f7ead8 48%, #eef4ff 100%);
+      padding:14px 16px;
+      margin:0 0 18px;
+      display:grid;
+      gap:8px;
+      box-shadow:0 2px 10px rgba(126,88,31,.12);
+    }
+    .highlight-criterion-panel.required-missing{
+      border-color:#c62828;
+      box-shadow:0 0 0 4px rgba(198,40,40,.14);
+    }
+    .highlight-criterion-row{
+      display:grid;
+      grid-template-columns:minmax(170px, .45fr) minmax(260px, .85fr) minmax(130px, .3fr);
+      gap:12px;
+      align-items:center;
+    }
+    .highlight-criterion-panel label{
+      font-size:.98rem;
+      font-weight:800;
+      color:#4f4360;
+    }
+    .highlight-criterion-select{
+      width:100%;
+      padding:11px 12px;
+      border:1px solid #c7b7e6;
+      border-radius:12px;
+      background:#fff;
+      color:#333;
+      font:inherit;
+      font-weight:700;
+    }
+    .highlight-criterion-help{
+      font-size:.92rem;
+      line-height:1.35;
+      color:#5f6470;
+    }
+    .highlight-criterion-help strong{color:#4f4360;}
+    .highlight-criterion-mode{
+      display:inline-block;
+      width:max-content;
+      padding:3px 9px;
+      border-radius:999px;
+      background:#e9f7ee;
+      color:#2e7d32;
+      font-size:12px;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      justify-self:end;
+    }
+    .highlight-criterion-mode.manual{
+      background:#fff4df;
+      color:#8a6d3b;
+    }
+    .required-missing{
+      border-color:#c62828 !important;
+      box-shadow:0 0 0 4px rgba(198,40,40,.16) !important;
+    }
+    .criterion-summary-note{
+      display:grid;
+      gap:4px;
+      margin-top:10px;
+      padding-top:10px;
+      border-top:1px solid rgba(79,67,96,.22);
+      font-size:.95rem;
+    }
+    .criterion-summary-note span{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .criterion-summary-card.c1{background:#ddb2c2;}
+    .criterion-summary-card.c2{background:#d4c2ee;}
+    .criterion-summary-card.c3{background:#bb97d3;}
+    .criterion-summary-card.c4{background:#b8a1ea;}
+    .criterion-summary-card.c5{background:#eda0b3;}
+    .criterion-summary-card.c6{background:#f4b1b1;}
+    @media (max-width: 900px){
+      .summary-total{grid-template-columns:1fr;}
+      .criteria-summary-grid{grid-template-columns:1fr;}
+      .highlight-criterion-row{grid-template-columns:1fr;}
+    }
+
+
+    .evaluation-pill{
+      display:inline-flex;
+      align-items:center;
+      position:relative;
+      min-width:150px;
+      max-width:170px;
+      border-radius:999px;
+      padding:0 12px;
+      color:#fff;
+      font-weight:700;
+      vertical-align:middle;
+    }
+    .evaluation-pill.status-cumple{ background:#2e7d32; }
+    .evaluation-pill.status-nocumple{ background:#c62828; }
+    .evaluation-pill.status-noaplica{ background:#111; }
+
+    .evaluation-pill::after{
+      content:'▼';
+      position:absolute;
+      right:10px;
+      top:50%;
+      transform:translateY(-50%);
+      font-size:10px;
+      pointer-events:none;
+      color:#fff;
+      opacity:.9;
+    }
+
+    .evaluation-select{
+      width:100%;
+      min-width:120px;
+      padding:6px 18px 6px 0;
+      border:none;
+      outline:none;
+      font:inherit;
+      font-weight:700;
+      color:#fff;
+      background:transparent !important;
+      appearance:none;
+      -webkit-appearance:none;
+      -moz-appearance:none;
+      cursor:pointer;
+      line-height:1.2;
+    }
+    .evaluation-select option{
+      color:#111;
+      background:#fff;
+    }
+
+
+    .outcome-status{margin:0 0 14px 0;}
+    .outcome-card{
+      border-radius:16px;
+      padding:14px 16px;
+      border:1px solid #e5e7eb;
+      background:#fff;
+      box-shadow:0 1px 4px rgba(0,0,0,.04);
+    }
+    .outcome-label{
+      font-size:.95rem;
+      font-weight:700;
+      margin-bottom:10px;
+      color:#4b5563;
+    }
+    .outcome-row{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      flex-wrap:wrap;
+    }
+    .outcome-select{
+      width:100%;
+      max-width:420px;
+      padding:10px 14px;
+      border:none;
+      border-radius:12px;
+      font:inherit;
+      font-weight:800;
+      color:#fff;
+      appearance:none;
+      -webkit-appearance:none;
+      -moz-appearance:none;
+      cursor:pointer;
+      background-repeat:no-repeat;
+      background-position:right 12px center;
+      background-size:12px;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);
+      flex:0 0 420px;
+    }
+    .outcome-select.status-supera{
+      background-color:#23c552;
+      background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    }
+    .outcome-select.status-pendiente{
+      background-color:#ff3b30;
+      background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    }
+    .outcome-meta{
+      font-size:.96rem;
+      color:#4b5563;
+      line-height:1.35;
+      font-weight:600;
+      flex:1 1 300px;
+    }
+    .outcome-meta strong{
+      color:#111827;
+    }
+
+</style>
+</head>
+<body class="locked">
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+      <div class="login-title">Sociedad de Evaluadores</div>
+<div class="login-subtitle">Acceso al gestor de informes de centros comprometidos contra la violencia de género</div>
+      <p>Introduce tus credenciales para abrir el archivo.</p>
+      <div class="login-field">
+        <label for="loginUser">Usuario</label>
+        <input id="loginUser" type="text" autocomplete="username" />
+      </div>
+      <div class="login-field">
+        <label for="loginPass">Contraseña</label>
+        <div class="password-wrap">
+  <input id="loginPass" type="password" autocomplete="current-password" />
+  <span class="toggle-pass" id="togglePass">👁</span>
+</div>
+      </div>
+      <label class="login-remember" for="loginRemember">
+        <input id="loginRemember" type="checkbox" checked />
+        <span>Recordarme en este navegador</span>
+      </label>
+      <div class="login-actions">
+        <button id="loginBtn" class="login-btn" type="button">Entrar</button>
+      </div>
+      <div id="loginError" class="login-error"></div>
+    </div>
+  </div>
+  <div id="appShell">
+  <header class="app-header">
+    <div class="app-header-left">
+      <img src="logos/logo_vg.png" alt="Centros comprometidos contra la violencia de género"
+           onerror="this.style.display='none'">
+    </div>
+    <div class="app-header-center">
+      <div class="app-header-title">Gestor de informes</div>
+      <div class="app-header-subtitle">Centros comprometidos contra la violencia de género</div>
+    </div>
+    <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+      <div id="userNameDisplay" style="font-size:12px;color:#666;text-align:right;min-height:16px;width:100%;"></div>
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;width:100%;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="se-label">Sociedad de<br>Evaluadores</div>
+          <img src="logos/logo_SE.png" alt="Sociedad de Evaluadores"
+               onerror="this.style.display='none'">
+        </div>
+        <button id="logoutBtn" class="btn" style="display:none;white-space:nowrap;">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page">
+    <div class="toolbar">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;">
+        <div style="display:flex;align-items:flex-start;gap:12px;min-width:0;max-width:420px;">
+          <label class="btn" style="text-align:center; line-height:1.2;" for="fileInput"><span>Importar</span><br><span>archivo WORD</span></label>
+          <input id="fileInput" type="file" accept=".doc,.docx" hidden />
+          <span class="file-name" id="fileName">Sin archivo cargado</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><button id="historyBtn" class="btn-history" type="button">Historial de informes</button><button id="loadVersionBtn" class="btn-load-version" type="button">Importar informe</button><button id="saveVersionBtn" class="btn-save-version" type="button" disabled>Guardar informe</button><button id="generatePdfBtn" class="btn-generate" type="button" disabled>Generar informe PDF</button><input id="loadVersionInput" type="file" accept=".json" hidden></div>
+      </div>
+
+      <div class="radio-group">
+        <label for="filterTodos"><input id="filterTodos" type="radio" name="filter" value="TODOS" checked onchange="applyCurrentFilter()"> Todos los estándares</label>
+        <label for="filterNoCumple"><input id="filterNoCumple" type="radio" name="filter" value="NOCUMPLE" onchange="applyCurrentFilter()"> Solo estándares que no se cumplen</label>
+        <label for="filterNoCumpleFam"><input id="filterNoCumpleFam" type="radio" name="filter" value="NOCUMPLE_FAM" onchange="applyCurrentFilter()"> Estándares que no se cumplen o con fortalezas y áreas de mejora</label>
+      </div>
+    </div>
+
+    <div id="reportTitle" class="report-title-block">
+      <div class="report-main-title">Informe de evaluación</div>
+      <div class="title-editor">
+        <div class="title-editor-row">
+          <label for="centerInput"><span class="label-highlight">Nombre del centro *</span></label>
+          <input id="centerInput" class="center-box" type="text" value="">
+        </div>
+        <div class="title-editor-row">
+          <label for="projectCodeInput"><span class="label-highlight">Código del proyecto *</span></label>
+          <input id="projectCodeInput" class="code-box" type="text" value="">
+        </div>
+      </div>
+    </div>
+
+
+    <div id="versionsPanel" class="versions-panel" style="display:none;">
+      <div class="versions-head">
+        <div><div class="versions-title">Historial de informes</div><div class="version-meta">Aquí aparecen las informes guardadas en este navegador. El botón Importar informe sirve para abrir un archivo que hayas descargado antes, normalmente desde Descargas.</div></div>
+        <div class="versions-actions">
+          <button id="clearVersionsBtn" class="btn-clear-versions" type="button">Borrar historial</button>
+        </div>
+      </div>
+      <div id="versionsList" class="versions-list"></div>
+    </div>
+
+    <div id="outcomeStatus" class="outcome-status" style="display:none"></div>
+
+    <div id="summary" class="summary" style="display:none"></div>
+    <div id="highlightCriterionContainer" style="display:none"></div>
+
+    <div id="report" class="panel placeholder">
+      <strong>Sin datos</strong><br>
+      Selecciona un archivo DOCX para comenzar.
+    </div>
+  </div>
+
+  <img id="pdfLogoPortada" src="logos/logo_portada.png" alt="" style="display:none">
+  <img id="pdfLogoPacto" src="logos/logo_pacto.png" alt="" style="display:none">
+  <img id="pdfLogoConsejeria" src="logos/logo_consejeria.png" alt="" style="display:none">
+  <img id="pdfLogoMinisterio" src="logos/logo_ministerio.png" alt="" style="display:none">
+  </div>
+<script src="ccvg-auth.local.js"></script>
+<script src="pdf-logos.local.js"></script>
+<script>
+
+const LOGIN_USER_STORAGE_KEY = 'ccvg_auth_user';
+const LOGIN_REMEMBER_STORAGE_KEY = 'ccvg_auth_remember';
+function getAuthConfig() {
+  const cfg = window.CCVG_AUTH_CONFIG;
+  if (!cfg || typeof cfg !== 'object') {
+    throw new Error('No se ha encontrado la configuración de acceso. Revisa el archivo ccvg-auth.local.js.');
+  }
+
+  const user = String(cfg.user || '').trim();
+  const pass = String(cfg.password || '');
+  if (!user || !pass) {
+    throw new Error('La configuración de acceso de ccvg-auth.local.js está incompleta.');
+  }
+
+  return { user, password: pass };
+}
+
+function showLoginConfigError(message) {
+  const err = document.getElementById('loginError');
+  if (err) err.textContent = message;
+}
+
+function updateUserNameDisplay(name='') {
+  const userEl = document.getElementById('userNameDisplay');
+  const safeName = String(name || '').trim();
+  if (userEl) {
+    userEl.textContent = safeName || '';
+  }
+  try {
+    if (safeName) {
+      localStorage.setItem(LOGIN_USER_STORAGE_KEY, safeName);
+    }
+  } catch (e) {}
+}
+
+function openApp() {
+  const overlay = document.getElementById('loginOverlay');
+  const shell = document.getElementById('appShell');
+  if (overlay) overlay.style.display = 'none';
+  if (shell) shell.style.display = 'block';
+  document.body.classList.remove('locked');
+  const lb = document.getElementById('logoutBtn');
+  if (lb) lb.style.display = 'inline-block';
+  let fallbackUser = '';
+  try {
+    fallbackUser = getAuthConfig().user;
+  } catch (e) {}
+  const currentUser = (() => {
+    try { return localStorage.getItem(LOGIN_USER_STORAGE_KEY) || document.getElementById('loginUser')?.value?.trim() || fallbackUser; }
+    catch (e) { return document.getElementById('loginUser')?.value?.trim() || fallbackUser; }
+  })();
+  updateUserNameDisplay(currentUser);
+}
+
+function tryLogin() {
+  const userEl = document.getElementById('loginUser');
+  const passEl = document.getElementById('loginPass');
+  const rememberEl = document.getElementById('loginRemember');
+  const err = document.getElementById('loginError');
+  const u = String(userEl?.value || '').trim();
+  const p = String(passEl?.value || '');
+  const shouldRemember = Boolean(rememberEl?.checked);
+
+  if (!u || !p) {
+    if (err) err.textContent = 'Introduce usuario y contraseña.';
+    return;
+  }
+
+  let auth;
+  try {
+    auth = getAuthConfig();
+  } catch (e) {
+    showLoginConfigError(e.message || 'No se ha podido leer la configuración de acceso.');
+    return;
+  }
+
+  if (u === auth.user && p === auth.password) {
+    if (err) err.textContent = '';
+    try {
+      if (shouldRemember) {
+        localStorage.setItem('ccvg_auth_ok', '1');
+      } else {
+        localStorage.removeItem('ccvg_auth_ok');
+      }
+      localStorage.setItem(LOGIN_REMEMBER_STORAGE_KEY, shouldRemember ? '1' : '0');
+      localStorage.setItem(LOGIN_USER_STORAGE_KEY, u);
+    } catch (e) {}
+    updateUserNameDisplay(u);
+    openApp();
+  } else {
+    if (err) err.textContent = 'Usuario o contraseña incorrectos.';
+  }
+}
+
+document.getElementById('loginBtn').addEventListener('click', tryLogin);
+document.getElementById('loginPass').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') tryLogin();
+});
+document.getElementById('loginUser').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') tryLogin();
+});
+
+
+document.getElementById('togglePass').addEventListener('click', () => {
+  const inp = document.getElementById('loginPass');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+});
+
+
+// Logout
+document.addEventListener('click', (e)=>{
+  if (e.target && e.target.id === 'logoutBtn'){
+    try { localStorage.removeItem('ccvg_auth_ok'); } catch(e){}
+    try { localStorage.removeItem(LOGIN_USER_STORAGE_KEY); } catch(e){}
+    // volver a bloquear
+    const overlay = document.getElementById('loginOverlay');
+    const shell = document.getElementById('appShell');
+    if (overlay && shell){
+      overlay.style.display = 'flex';
+      shell.style.display = 'none';
+      document.body.classList.add('locked');
+    }
+    const err = document.getElementById('loginError');
+    if (err) err.textContent = '';
+    const u = document.getElementById('loginUser');
+    const p = document.getElementById('loginPass');
+    const remember = document.getElementById('loginRemember');
+    if (u) u.value = '';
+    if (p) p.value = '';
+    if (remember) remember.checked = true;
+    updateUserNameDisplay('');
+    }
+});
+
+let currentData = null;
+
+document.getElementById('fileInput').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('summary').style.display = 'none';
+  document.getElementById('highlightCriterionContainer').style.display = 'none';
+
+  const lowerName = (file.name || '').toLowerCase();
+
+  if (lowerName.endsWith('.doc') && !lowerName.endsWith('.docx')) {
+    alert('Este archivo está en formato .doc. Debes convertirlo antes a .docx para que la aplicación lo lea correctamente.');
+    enableFilters(false);
+    enableGeneratePdf(false);
+    enableSaveVersion(false);
+    enableGeneratePdf(false);
+    currentData = null;
+    document.getElementById('reportTitle').innerHTML = renderEditableHeader('', '');
+    document.getElementById('reportTitle').querySelector('.report-main-title').textContent = 'Archivo .doc detectado';
+    document.getElementById('report').innerHTML = `
+      <div class="notice-doc">
+        <strong>Este archivo está en formato .doc y no puede procesarse directamente.</strong>
+        <ol>
+          <li>Ábrelo en Microsoft Word.</li>
+          <li>Elige <strong>Guardar como</strong> y guárdalo en formato <strong>.docx</strong>.</li>
+          <li>Vuelve a subir aquí el archivo <strong>.docx</strong>.</li>
+        </ol>
+      </div>
+    `;
+    ev.target.value = '';
+    document.getElementById('fileName').textContent = 'Sin archivo cargado';
+    return;
+  }
+
+  if (!lowerName.endsWith('.docx')) {
+    alert('Solo se pueden importar archivos Word en formato .docx.');
+    ev.target.value = '';
+    document.getElementById('fileName').textContent = 'Sin archivo cargado';
+    return;
+  }
+
+  document.getElementById('reportTitle').innerHTML = '<div class="report-main-title">Procesando...</div>';
+  document.getElementById('report').innerHTML = '<div class="placeholder">Procesando documento...</div>';
+
+  try {
+    await ensureRequiredLibraries();
+    const arrayBuffer = await file.arrayBuffer();
+    currentData = await parseDocx(arrayBuffer, file.name);
+    currentData.evaluationOutcome = '';
+    currentData.evaluationOutcomeManual = false;
+    enableFilters(true);
+    enableGeneratePdf(true);
+    enableSaveVersion(true);
+    enableGeneratePdf(true);
+    const defaultFilter = document.getElementById('filterTodos');
+    if (defaultFilter) defaultFilter.checked = true;
+    renderAll();
+    applyCurrentFilter();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('reportTitle').innerHTML = '<div class="report-main-title">Extractor local de informe CCVG</div>';
+    document.getElementById('report').innerHTML = '<div class="placeholder">Error al procesar el documento.</div>';
+    document.getElementById('summary').style.display = 'block';
+    document.getElementById('summary').innerHTML = '<span class="muted">' + escapeHtml(String(e.message || e)) + '</span>';
+    document.getElementById('highlightCriterionContainer').style.display = 'none';
+    enableFilters(false);
+    enableGeneratePdf(false);
+    enableSaveVersion(false);
+  }
+});
+
+document.querySelectorAll('input[name="filter"]').forEach(el => {
+  el.addEventListener('change', () => {
+    if (!currentData) return;
+    applyCurrentFilter();
+  });
+});
+
+document.getElementById('saveVersionBtn').addEventListener('click', () => {
+  try {
+    syncEditableHeader();
+    updateTopPanelStatuses();
+    saveLocalData();
+    saveVersionFile();
+  } catch (err) {
+    alert('No se pudo guardar la informe: ' + (err.message || err));
+  }
+});
+
+document.getElementById('generatePdfBtn').addEventListener('click', async () => {
+  if (currentData && (!currentData.projectCode || !currentData.centerName) && currentData.meta && currentData.meta.title) {
+    try {
+      const parts = splitTitleParts(currentData.meta.title || '');
+      currentData.projectCode = currentData.projectCode || String(parts.code || '').trim();
+      currentData.centerName = currentData.centerName || String(stripEntityCode(parts.applicant || '')).trim();
+    } catch(e) {}
+  }
+
+  syncEditableHeader();
+  syncEvaluationOutcomeFromSelect();
+
+  const requiredCode = String(document.getElementById('projectCodeInput')?.value || currentData?.projectCode || '').trim();
+  const requiredCenter = String(document.getElementById('centerInput')?.value || currentData?.centerName || '').trim();
+  const requiredLeadEvaluator = String(document.getElementById('leadEvaluatorInput')?.value || currentData?.leadEvaluator || '').trim();
+  const requiredCenterManagement = String(document.getElementById('centerManagementInput')?.value || currentData?.centerManagement || '').trim();
+  const requiredCertificationResponsible = String(document.getElementById('certificationResponsibleInput')?.value || currentData?.certificationResponsible || '').trim();
+  const requiredSelfEvalStartDate = String(document.getElementById('selfEvalStartDateInput')?.value || currentData?.selfEvalStartDate || '').trim();
+  const requiredExternalEvalDate = String(document.getElementById('externalEvalDateInput')?.value || currentData?.externalEvalDate || '').trim();
+  const requiredHighlightedCriterion = String(document.getElementById('highlightCriterionSelect')?.value || currentData?.highlightedCriterionCode || '').trim();
+
+  const missing = [];
+  if (!requiredCode) missing.push({ label:'Código del proyecto', selector:'#projectCodeInput' });
+  if (!requiredCenter) missing.push({ label:'Nombre del centro', selector:'#centerInput' });
+  if (!requiredLeadEvaluator) missing.push({ label:'Evaluador jefe', selector:'#leadEvaluatorInput' });
+  if (!requiredCenterManagement) missing.push({ label:'Gerencia del centro', selector:'#centerManagementInput' });
+  if (!requiredCertificationResponsible) missing.push({ label:'Responsable del centro para el seguimiento de la certificación', selector:'#certificationResponsibleInput' });
+  if (!requiredSelfEvalStartDate) missing.push({ label:'Fecha de inicio de autoevaluación', selector:'#selfEvalStartDateInput' });
+  if (!requiredExternalEvalDate) missing.push({ label:'Fecha de evaluación externa', selector:'#externalEvalDateInput' });
+  if (!requiredHighlightedCriterion) missing.push({ label:'Criterio destacado', selector:'#highlightCriterionSelect' });
+
+  if (missing.length) {
+    markMissingFields(missing);
+    alert('No se puede generar el PDF. Falta por completar: ' + missing.map(x => x.label).join(', ') + '.');
+    return;
+  }
+
+  try {
+    await ensureRequiredLibraries();
+    await generateCoverPdf();
+  } catch (err) {
+    alert('No se pudo generar el PDF: ' + (err.message || err));
+  }
+});
+
+
+document.addEventListener('click', (ev) => {
+  const head = ev.target.closest('.criterion-head');
+  if (!head) return;
+  const section = head.closest('.criterion');
+  if (!section) return;
+  section.classList.toggle('collapsed');
+  if (!section.classList.contains('collapsed')) {
+    setTimeout(() => { autosizeJustificationTextareas(section); autosizeEditableList(section); }, 0);
+  }
+});
+
+
+function enableFilters(enabled){
+  document.querySelectorAll('input[name="filter"]').forEach(el => {
+    el.disabled = !enabled;
+    const label = el.closest('label');
+    if (label) label.style.opacity = enabled ? '1' : '.55';
+    if (label) label.style.cursor = enabled ? 'pointer' : 'default';
+  });
+}
+function enableGeneratePdf(enabled){
+  const btn = document.getElementById('generatePdfBtn');
+  if (btn) btn.disabled = !enabled;
+}
+function enableSaveVersion(enabled){
+  const btn = document.getElementById('saveVersionBtn');
+  if (btn) btn.disabled = !enabled;
+}
+
+function fieldHighlightTarget(el) {
+  if (!el) return null;
+  if (el.id === 'highlightCriterionSelect') return document.getElementById('highlightCriterionPanel') || el;
+  return el;
+}
+
+function clearMissingFieldHighlight(selectorOrEl) {
+  const el = typeof selectorOrEl === 'string' ? document.querySelector(selectorOrEl) : selectorOrEl;
+  const target = fieldHighlightTarget(el);
+  if (target) target.classList.remove('required-missing');
+}
+
+function markMissingFields(items=[]) {
+  document.querySelectorAll('.required-missing').forEach(el => el.classList.remove('required-missing'));
+  let first = null;
+  items.forEach((item) => {
+    const el = document.querySelector(item.selector);
+    const target = fieldHighlightTarget(el);
+    if (target) {
+      target.classList.add('required-missing');
+      if (!first) first = target;
+    }
+  });
+  if (first) {
+    try { first.scrollIntoView({ behavior:'smooth', block:'center' }); } catch (e) {}
+  }
+}
+
+function xmlToDoc(xmlString) {
+  return new DOMParser().parseFromString(xmlString, 'application/xml');
+}
+function q(node, sel){ return node.querySelector(sel); }
+function qa(node, sel){ return Array.from(node.querySelectorAll(sel)); }
+function txt(node){ return qa(node, 'w\\:t, t').map(n => n.textContent || '').join('').trim(); }
+function styleOfP(p) {
+  const el = q(p, 'w\\:pPr > w\\:pStyle, pPr > pStyle');
+  return el ? (el.getAttribute('w:val') || el.getAttribute('val') || '') : '';
+}
+function clean(s='') { return s.replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim(); }
+function cleanLeadingPunctuation(s='') {
+  return clean(String(s).replace(/^[:.\-–—\s]+/, ''));
+}
+function isCriterion(style, text) { return style === 'Ttulo3' || /^\d+\.\s/.test(text); }
+function isStandard(style, text) { return style === 'Ttulo4' || /^Estándar\s+\d+\.\d+/.test(text); }
+function isSectionLabel(style, text) { return style === 'Ttulo6' || /^(Áreas de mejora|Area de Mejora|Fortalezas)$/i.test(text); }
+function isEOHeader(style, text) { return style === 'Ttulo5' || /^Elementos orientativos$/i.test(text); }
+function isEOText(text) { return /^\d+\.\d+\.\d+\./.test(text); }
+
+function parseTable(tbl) {
+  const rows = qa(tbl, 'w\\:tr, tr').map(tr =>
+    qa(tr, 'w\\:tc, tc').map(tc => clean(txt(tc)))
+  );
+  if (!rows.length) return null;
+  return { headers: rows[0] || [], values: rows[1] || [] };
+}
+function classifyEval(value='') {
+  const v = value.toLowerCase();
+  if (v.includes('no cumple')) return 'No cumple';
+  if (v.includes('parcial')) return 'Cumple parcialmente';
+  if (v.includes('cumple')) return 'Cumple';
+  return value || '';
+}
+function hasFam(standard){
+  if ((standard.areasMejora||[]).length || (standard.fortalezas||[]).length) return true;
+  return (standard.eos||[]).some(eo => (eo.areasMejora||[]).length || (eo.fortalezas||[]).length);
+}
+function stdEvalFails(standard){
+  return (standard.evaluation || '').toLowerCase().includes('no cumple');
+}
+function stdFails(standard){
+  if (stdEvalFails(standard)) return true;
+  return (standard.eos||[]).some(eo => (eo.evaluation || '').toLowerCase().includes('no cumple'));
+}
+function shouldRenderStandard(standard, filter){
+  if (filter === 'TODOS') return true;
+  if (filter === 'NOCUMPLE') return stdEvalFails(standard);
+  if (filter === 'NOCUMPLE_FAM') return stdFails(standard) || hasFam(standard);
+  return true;
+}
+function failLevel(fail){
+  if (fail === 0) return 'level-ok';
+  if (fail <= 2) return 'level-warn';
+  return 'level-bad';
+}
+
+async function ensureRequiredLibraries() {
+  if (window.CCVG_LIBS_READY) {
+    await window.CCVG_LIBS_READY;
+  }
+}
+
+function getSavedEditableData() {
+  try {
+    const raw = localStorage.getItem(EDITABLE_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function mergeEditableDraftIntoCurrentData(preferExisting=true) {
+  if (!currentData) return;
+  const draft = getSavedEditableData();
+  const fields = [
+    'centerName',
+    'projectCode',
+    'leadEvaluator',
+    'evaluator',
+    'centerManagement',
+    'certificationResponsible',
+    'selfEvalStartDate',
+    'externalEvalDate'
+  ];
+
+  fields.forEach((field) => {
+    const draftValue = String(draft[field] || '').trim();
+    const currentValue = String(currentData[field] || '').trim();
+    if (!draftValue) return;
+    if (preferExisting && currentValue) return;
+    currentData[field] = field === 'centerName' ? draftValue.toUpperCase() : draftValue;
+  });
+}
+
+function renderEditableHeader(centerName='', projectCode='') {
+  currentData = currentData || { meta: { title: 'Informe de evaluación', fileName: '', source: 'local' }, criteria: [] };
+  currentData.centerName = String(centerName || currentData.centerName || '').toUpperCase().trim();
+  currentData.projectCode = String(projectCode || currentData.projectCode || '').trim();
+  return renderStructuredTitle(currentData.meta?.title || 'Informe de evaluación');
+}
+
+function validateVersionPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('El archivo JSON no tiene un formato válido.');
+  }
+
+  const normalized = {
+    savedAt: payload.savedAt || new Date().toISOString(),
+    centerName: String(payload.centerName || '').toUpperCase().trim(),
+    projectCode: String(payload.projectCode || '').trim(),
+    sourceFileName: String(payload.sourceFileName || ''),
+    versionName: String(payload.versionName || payload.projectCode || '').trim(),
+    leadEvaluator: String(payload.leadEvaluator || '').trim(),
+    evaluator: String(payload.evaluator || '').trim(),
+    centerManagement: String(payload.centerManagement || '').trim(),
+    certificationResponsible: String(payload.certificationResponsible || '').trim(),
+    selfEvalStartDate: String(payload.selfEvalStartDate || '').trim(),
+    externalEvalDate: String(payload.externalEvalDate || '').trim(),
+    evaluationOutcome: String(payload.evaluationOutcome || '').trim(),
+    evaluationOutcomeManual: !!payload.evaluationOutcomeManual,
+    highlightedCriterionCode: String(payload.highlightedCriterionCode || payload.highlightedCriterion || '').trim(),
+    highlightedCriterionManual: !!payload.highlightedCriterionManual,
+    criteria: Array.isArray(payload.criteria) ? payload.criteria : [],
+    meta: (payload.meta && typeof payload.meta === 'object' && !Array.isArray(payload.meta)) ? payload.meta : {}
+  };
+
+  if (!normalized.centerName && !normalized.projectCode && !normalized.criteria.length) {
+    throw new Error('El JSON importado no contiene datos suficientes del informe.');
+  }
+
+  return normalized;
+}
+
+
+
+const VERSION_STORAGE_KEY = 'informeCCVG_versions';
+const EDITABLE_STORAGE_KEY = 'informeCCVG_editable';
+
+function getVersions() {
+  try {
+    return JSON.parse(localStorage.getItem(VERSION_STORAGE_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function setVersions(items) {
+  localStorage.setItem(VERSION_STORAGE_KEY, JSON.stringify(items));
+}
+
+function renderVersionsList() {
+  const panel = document.getElementById('versionsPanel');
+  const list = document.getElementById('versionsList');
+  if (!panel || !list) return;
+
+  const versions = getVersions();
+  const currentCenter = String(currentData?.centerName || '').toUpperCase().trim();
+
+  // Si no hay proyecto/centro cargado, ocultar historial
+  if (!currentCenter) {
+    panel.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+
+  // Solo informes del proyecto actual (mismo centro)
+  const filtered = versions.filter(v =>
+    String(v.centerName || '').toUpperCase().trim() === currentCenter
+  );
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="version-empty">No hay informes guardadas para este centro.</div>';
+    panel.style.display = 'none';
+    return;
+  }
+
+  list.innerHTML = filtered.map((v, idx) => {
+    const savedAt = v.savedAt ? new Date(v.savedAt) : null;
+    const savedText = savedAt && !isNaN(savedAt) ? savedAt.toLocaleString('es-ES') : '';
+    return `
+      <div class="version-card">
+        <div class="version-card-top">
+          <div>
+            <div class="version-name">${escapeHtml(String(v.centerName || 'SIN NOMBRE').toUpperCase())}</div>
+            <div class="version-meta">Código: ${escapeHtml(v.projectCode || '')}</div>
+            <div class="version-meta">Guardado: ${escapeHtml(savedText)}</div>
+            ${v.sourceFileName ? `<div class="version-meta">Origen: ${escapeHtml(v.sourceFileName)}</div>` : ''}
+          </div>
+          <div class="version-actions">
+            <button class="version-btn" type="button" data-load-version="${escapeHtml(v.savedAt || String(idx))}">Cargar</button>
+            <button class="version-btn" type="button" data-download-version="${escapeHtml(v.savedAt || String(idx))}">Descargar JSON</button>
+            <button class="version-btn" type="button" data-delete-version="${escapeHtml(v.savedAt || String(idx))}">Eliminar</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function buildCurrentVersionPayload() {
+  return {
+    savedAt: new Date().toISOString(),
+    centerName: String(document.getElementById('centerInput')?.value || currentData?.centerName || '').toUpperCase().trim(),
+    projectCode: String(document.getElementById('projectCodeInput')?.value || currentData?.projectCode || '').trim(),
+    sourceFileName: currentData?.meta?.fileName || '',
+    versionName: String(document.getElementById('projectCodeInput')?.value || currentData?.projectCode || '').trim(),
+    leadEvaluator: String(document.getElementById('leadEvaluatorInput')?.value || currentData?.leadEvaluator || '').trim(),
+    evaluator: String(document.getElementById('evaluatorInput')?.value || currentData?.evaluator || '').trim(),
+    centerManagement: String(document.getElementById('centerManagementInput')?.value || currentData?.centerManagement || '').trim(),
+    certificationResponsible: String(document.getElementById('certificationResponsibleInput')?.value || currentData?.certificationResponsible || '').trim(),
+    selfEvalStartDate: String(document.getElementById('selfEvalStartDateInput')?.value || currentData?.selfEvalStartDate || '').trim(),
+    externalEvalDate: String(document.getElementById('externalEvalDateInput')?.value || currentData?.externalEvalDate || '').trim(),
+    evaluationOutcome: String(currentData?.evaluationOutcome || '').trim(),
+    evaluationOutcomeManual: !!currentData?.evaluationOutcomeManual,
+    highlightedCriterionCode: String(currentData?.highlightedCriterionCode || '').trim(),
+    highlightedCriterionManual: !!currentData?.highlightedCriterionManual,
+    criteria: Array.isArray(currentData?.criteria) ? currentData.criteria : [],
+    meta: currentData?.meta || {}
+  };
+}
+
+function applyVersionPayload(payload) {
+  payload = validateVersionPayload(payload);
+  currentData = currentData || { meta: { fileName: '', title: 'Informe de evaluación', source: 'version' }, criteria: [] };
+  currentData.meta = currentData.meta || { fileName: '', title: 'Informe de evaluación', source: 'version' };
+  currentData.meta.source = 'version';
+  currentData.centerName = String(payload.centerName || '').toUpperCase().trim();
+  currentData.projectCode = String(payload.projectCode || '').trim();
+  currentData.loadedVersionName = String(payload.versionName || payload.projectCode || '').trim();
+  currentData.loadedVersionSource = payload.sourceFileName ? `Origen: ${payload.sourceFileName}` : 'Informe importado';
+  currentData.loadedVersionDate = payload.savedAt ? new Date(payload.savedAt).toLocaleString('es-ES') : '';
+  currentData.leadEvaluator = String(payload.leadEvaluator || '').trim();
+  currentData.evaluator = String(payload.evaluator || '').trim();
+  currentData.centerManagement = String(payload.centerManagement || '').trim();
+  currentData.certificationResponsible = String(payload.certificationResponsible || '').trim();
+  currentData.selfEvalStartDate = String(payload.selfEvalStartDate || '').trim();
+  currentData.externalEvalDate = String(payload.externalEvalDate || '').trim();
+  currentData.evaluationOutcome = String(payload.evaluationOutcome || '').trim();
+  currentData.evaluationOutcomeManual = !!payload.evaluationOutcomeManual;
+  currentData.highlightedCriterionCode = String(payload.highlightedCriterionCode || '').trim();
+  currentData.highlightedCriterionManual = !!payload.highlightedCriterionManual;
+  currentData.criteria = Array.isArray(payload.criteria) ? payload.criteria : [];
+  currentData.meta.fileName = payload.sourceFileName || currentData.meta.fileName || '';
+
+  document.getElementById('fileName').textContent = payload.sourceFileName ? `Informe: ${payload.sourceFileName}` : 'Informe cargado';
+  document.getElementById('reportTitle').innerHTML = renderStructuredTitle('Informe de evaluación');
+
+  setTimeout(() => {
+    const centerInput = document.getElementById('centerInput');
+    const codeInput = document.getElementById('projectCodeInput');
+    if (centerInput) centerInput.value = currentData.centerName;
+    if (codeInput) codeInput.value = currentData.projectCode;
+    syncEditableHeader();
+    updateTopPanelStatuses();
+    saveLocalData();
+    document.getElementById('reportTitle').innerHTML = renderStructuredTitle('Informe de evaluación');
+    enableSaveVersion(true);
+    enableGeneratePdf(true);
+    enableFilters(!!(currentData.criteria && currentData.criteria.length));
+
+    const defaultFilter = document.getElementById('filterTodos');
+    if (defaultFilter) defaultFilter.checked = true;
+
+    const panel = document.getElementById('versionsPanel');
+    if (panel) panel.style.display = 'none';
+
+    if (currentData.criteria && currentData.criteria.length) {
+      document.getElementById('summary').style.display = 'block';
+      renderAll();
+    } else {
+      document.getElementById('summary').style.display = 'block';
+      document.getElementById('summary').innerHTML = `
+        <div class="report-head">
+          <div>
+            <h2>Resumen</h2>
+            <div class="muted">Informe cargado${payload.sourceFileName ? ': ' + escapeHtml(payload.sourceFileName) : ''}</div>
+          </div>
+        </div>
+        <div class="stats">
+          <span class="chip">Centro: ${escapeHtml(currentData.centerName || '')}</span>
+          <span class="chip">Código: ${escapeHtml(currentData.projectCode || '')}</span>
+        </div>
+      `;
+      enableFilters(false);
+      document.getElementById('report').className = 'panel placeholder';
+      document.getElementById('report').innerHTML = '<strong>Informe cargado</strong><br>Puedes revisar o corregir el centro y el código antes de generar el PDF.';
+    }
+  }, 10);
+}
+
+function downloadVersionPayload(payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+
+  const rawProjectCode = String(
+    payload.projectCode ||
+    document.getElementById('projectCodeInput')?.value ||
+    currentData?.projectCode ||
+    'proyecto'
+  ).trim();
+
+  const safeProject = rawProjectCode
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  a.href = url;
+  a.download = `${safeProject || 'proyecto'}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+
+function saveLocalData() {
+  try {
+    syncEditableHeader();
+    const payload = {
+      centerName: String(document.getElementById('centerInput')?.value || currentData?.centerName || '').toUpperCase().trim(),
+      projectCode: String(document.getElementById('projectCodeInput')?.value || currentData?.projectCode || '').trim(),
+      leadEvaluator: String(document.getElementById('leadEvaluatorInput')?.value || currentData?.leadEvaluator || '').trim(),
+      evaluator: String(document.getElementById('evaluatorInput')?.value || currentData?.evaluator || '').trim(),
+      centerManagement: String(document.getElementById('centerManagementInput')?.value || currentData?.centerManagement || '').trim(),
+      certificationResponsible: String(document.getElementById('certificationResponsibleInput')?.value || currentData?.certificationResponsible || '').trim(),
+      selfEvalStartDate: String(document.getElementById('selfEvalStartDateInput')?.value || currentData?.selfEvalStartDate || '').trim(),
+      externalEvalDate: String(document.getElementById('externalEvalDateInput')?.value || currentData?.externalEvalDate || '').trim(),
+      highlightedCriterionCode: String(currentData?.highlightedCriterionCode || '').trim(),
+      highlightedCriterionManual: !!currentData?.highlightedCriterionManual
+    };
+    localStorage.setItem(EDITABLE_STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) {}
+}
+
+function loadLocalData() {
+  try {
+    currentData = null;
+    document.getElementById('reportTitle').innerHTML = renderEditableHeader('', '');
+    currentData = null;
+    updateTopPanelStatuses();
+    enableSaveVersion(false);
+    enableGeneratePdf(false);
+    document.getElementById('fileName').textContent = 'Sin archivo cargado';
+    document.getElementById('summary').style.display = 'none';
+    const highlightBox = document.getElementById('highlightCriterionContainer');
+    if (highlightBox) {
+      highlightBox.style.display = 'none';
+      highlightBox.innerHTML = '';
+    }
+    const outcomeBox = document.getElementById('outcomeStatus');
+    if (outcomeBox) outcomeBox.style.display = 'none';
+    const panel = document.getElementById('versionsPanel');
+    if (panel) panel.style.display = 'none';
+    document.getElementById('report').className = 'panel placeholder';
+    document.getElementById('report').innerHTML = '<strong>Sin datos</strong><br>Selecciona un archivo DOCX para comenzar o importa una informe guardada.';
+  } catch (e) {
+    document.getElementById('reportTitle').innerHTML = renderEditableHeader('', '');
+  }
+  renderVersionsList();
+}
+
+function saveVersionFile() {
+  const payload = buildCurrentVersionPayload();
+  const versions = getVersions();
+  versions.unshift(payload);
+  setVersions(versions.slice(0, 50));
+  saveLocalData();
+  const panel = document.getElementById('versionsPanel');
+  if (panel) panel.style.display = 'none';
+  downloadVersionPayload(payload);
+}
+
+
+window.addEventListener('load', loadLocalData);
+
+document.getElementById('historyBtn').addEventListener('click', () => {
+  const panel = document.getElementById('versionsPanel');
+  if (!panel) return;
+  renderVersionsList();
+  const currentCenter = String(currentData?.centerName || '').toUpperCase().trim();
+  if (!currentCenter) {
+    panel.style.display = 'none';
+    return;
+  }
+  const isHidden = panel.style.display === 'none' || !panel.style.display;
+  panel.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) panel.scrollIntoView({ behavior:'smooth', block:'start' });
+});
+
+document.getElementById('loadVersionBtn').addEventListener('click', () => {
+  document.getElementById('loadVersionInput').click();
+});
+
+document.getElementById('loadVersionInput').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const payload = validateVersionPayload(JSON.parse(text));
+    applyVersionPayload(payload);
+    const versions = getVersions();
+    versions.unshift({
+      savedAt: payload.savedAt || new Date().toISOString(),
+      centerName: String(payload.centerName || '').toUpperCase(),
+      projectCode: String(payload.projectCode || ''),
+      sourceFileName: payload.sourceFileName || file.name || '',
+      versionName: payload.versionName || payload.projectCode || '',
+      leadEvaluator: String(payload.leadEvaluator || ''),
+      evaluator: String(payload.evaluator || ''),
+      centerManagement: String(payload.centerManagement || ''),
+      certificationResponsible: String(payload.certificationResponsible || ''),
+      selfEvalStartDate: String(payload.selfEvalStartDate || ''),
+      externalEvalDate: String(payload.externalEvalDate || ''),
+      evaluationOutcome: String(payload.evaluationOutcome || ''),
+      evaluationOutcomeManual: !!payload.evaluationOutcomeManual,
+      criteria: Array.isArray(payload.criteria) ? payload.criteria : [],
+      meta: payload.meta || {}
+    });
+    setVersions(versions.slice(0, 50));
+    const panel = document.getElementById('versionsPanel');
+    if (panel) panel.style.display = 'none';
+  } catch (err) {
+    alert('Error al cargar la informe: ' + (err.message || err));
+  } finally {
+    ev.target.value = '';
+  }
+});
+
+document.addEventListener('click', (ev) => {
+  const loadKey = ev.target?.getAttribute('data-load-version');
+  const downloadKey = ev.target?.getAttribute('data-download-version');
+  const deleteKey = ev.target?.getAttribute('data-delete-version');
+
+  if (loadKey !== null) {
+    const versions = getVersions();
+    const payload = versions.find(v => String(v.savedAt || '') === String(loadKey));
+    if (payload) applyVersionPayload(payload);
+  }
+
+  if (downloadKey !== null) {
+    const versions = getVersions();
+    const payload = versions.find(v => String(v.savedAt || '') === String(downloadKey));
+    if (payload) downloadVersionPayload(payload);
+  }
+
+  if (deleteKey !== null) {
+    const versions = getVersions().filter(v => String(v.savedAt || '') !== String(deleteKey));
+    setVersions(versions);
+    renderVersionsList();
+  }
+
+  if (ev.target && ev.target.id === 'clearVersionsBtn') {
+    localStorage.removeItem(VERSION_STORAGE_KEY);
+    const panel = document.getElementById('versionsPanel');
+    if (panel) panel.style.display = 'none';
+    renderVersionsList();
+  }
+});
+
+
+
+async function parseDocx(arrayBuffer, fileName='') {
+  const zip = await JSZip.loadAsync(arrayBuffer);
+  const xmlFile = zip.file('word/document.xml');
+  if (!xmlFile) throw new Error('El archivo no parece ser un DOCX válido.');
+  const xml = await xmlFile.async('string');
+  const doc = xmlToDoc(xml);
+  const body = q(doc, 'w\\:body, body');
+  if (!body) throw new Error('No se ha encontrado contenido en el DOCX.');
+
+  const children = Array.from(body.children).filter(n =>
+    ['p','tbl','w:p','w:tbl'].includes(n.nodeName.toLowerCase()) ||
+    n.nodeName.endsWith(':p') || n.nodeName.endsWith(':tbl')
+  );
+
+  const result = { meta: { fileName, title:'', source:'docx' }, criteria: [] };
+  let currentCriterion = null;
+  let currentStandard = null;
+  let currentEO = null;
+  let mode = 'STANDARD';
+  let lastSection = null;
+
+  for (const child of children) {
+    const local = child.localName || child.nodeName.split(':').pop();
+
+    if (local === 'p') {
+      const text = clean(txt(child));
+      if (!text) continue;
+      const style = styleOfP(child);
+
+      if (!result.meta.title && (style === 'Ttulo1' || /Informe de evaluación/i.test(text))) {
+        result.meta.title = text;
+        continue;
+      }
+      if (isCriterion(style, text)) {
+        currentCriterion = { code: text.split('.')[0], title: text, standards: [] };
+        result.criteria.push(currentCriterion);
+        currentStandard = null;
+        currentEO = null;
+        mode = 'STANDARD';
+        lastSection = null;
+        continue;
+      }
+      if (isStandard(style, text)) {
+        currentStandard = {
+          code: text.replace(/^Estándar\s+/i,'').trim(),
+          heading: text,
+          description: '',
+          essentiality: '',
+          autoevaluacion: '',
+          evaluation: '',
+          justification: '',
+          eos: [],
+          areasMejora: [],
+          fortalezas: []
+        };
+        currentCriterion && currentCriterion.standards.push(currentStandard);
+        currentEO = null;
+        mode = 'STANDARD';
+        lastSection = null;
+        continue;
+      }
+      if (!currentStandard) continue;
+
+      if (text.startsWith(':')) {
+        const stripped = cleanLeadingPunctuation(text);
+        currentStandard.description = clean((currentStandard.description + ' ' + stripped).trim());
+        continue;
+      }
+      if (/^(Esencial|No esencial)$/i.test(text)) {
+        if (mode === 'STANDARD') currentStandard.essentiality = text;
+        else if (currentEO) currentEO.essentiality = text;
+        continue;
+      }
+      if (/^Imprescindible$/i.test(text)) {
+        if (currentEO) currentEO.essentiality = text;
+        continue;
+      }
+      if (isEOHeader(style, text)) {
+        mode = 'EO';
+        lastSection = null;
+        continue;
+      }
+      if (isSectionLabel(style, text)) {
+        lastSection = /fortalezas/i.test(text) ? 'FORTALEZA' : 'AM';
+        continue;
+      }
+      if (isEOText(text)) {
+        const match = text.match(/^(\d+\.\d+\.\d+)\.?\s*(.*)$/);
+        currentEO = {
+          code: match?.[1] || '',
+          text: cleanLeadingPunctuation(match?.[2] || ''),
+          essentiality: '',
+          autoevaluacion: '',
+          evaluation: '',
+          justification: '',
+          areasMejora: [],
+          fortalezas: []
+        };
+        currentStandard.eos.push(currentEO);
+        mode = 'EO';
+        continue;
+      }
+
+      if (lastSection === 'AM') {
+        if (currentEO) currentEO.areasMejora.push(text);
+        else currentStandard.areasMejora.push(text);
+        continue;
+      }
+      if (lastSection === 'FORTALEZA') {
+        if (currentEO) currentEO.fortalezas.push(text);
+        else currentStandard.fortalezas.push(text);
+        continue;
+      }
+
+      if (!currentStandard.description) currentStandard.description = cleanLeadingPunctuation(text);
+    }
+
+    if (local === 'tbl') {
+      const info = parseTable(child);
+      if (!info || !currentStandard) continue;
+      const target = currentEO && mode === 'EO' ? currentEO : currentStandard;
+      target.autoevaluacion = info.values[0] || '';
+      target.evaluation = classifyEval(info.values[1] || '');
+      target.justification = info.values[2] || '';
+    }
+  }
+
+  if (!result.criteria.length) {
+    throw new Error('No se han detectado criterios o estándares. Revisa el formato del DOCX.');
+  }
+
+  return result;
+}
+
+
+function splitTitleParts(rawTitle='') {
+  const text = clean(String(rawTitle || '').replace(/\s+/g, ' '));
+
+  let m = text.match(/^(Informe de evaluación)\s*(.+?)\s*-\s*((?:\d{2}\/[A-Z]{2}\s*\d+\s*CCVG\s*\d{2}\/\d{4}))$/i);
+  if (m) {
+    return {
+      title: m[1].trim(),
+      applicant: stripEntityCode(m[2]),
+      code: clean(m[3])
+    };
+  }
+
+  m = text.match(/^(Informe de evaluación)\s*(.+?)\s+((?:\d{2}\/[A-Z]{2}\s*\d+\s*CCVG\s*\d{2}\/\d{4}))$/i);
+  if (m) {
+    return {
+      title: m[1].trim(),
+      applicant: stripEntityCode(m[2]),
+      code: clean(m[3])
+    };
+  }
+
+  if (/^Informe de evaluación/i.test(text)) {
+    return {
+      title: 'Informe de evaluación',
+      applicant: stripEntityCode(text.replace(/^Informe de evaluación/i, '')),
+      code: ''
+    };
+  }
+
+  return { title: text || 'Informe', applicant: '', code: '' };
+}
+
+
+function stripEntityCode(text='') {
+  return clean(String(text || '').replace(/^[A-Z]\d{7,8}[A-Z]\s+/i, ''));
+}
+
+function renderStructuredTitle(rawTitle='') {
+  const parts = splitTitleParts(rawTitle);
+  const centerUpper = String(parts.applicant || currentData?.centerName || '').toUpperCase();
+  const code = String(parts.code || currentData?.projectCode || '');
+  const versionName = String(currentData?.loadedVersionName || '').trim();
+  const versionSource = String(currentData?.loadedVersionSource || '').trim();
+  const versionDate = String(currentData?.loadedVersionDate || '').trim();
+  const leadEvaluator = String(currentData?.leadEvaluator || '').trim();
+  const evaluator = String(currentData?.evaluator || '').trim();
+  const centerManagement = String(currentData?.centerManagement || '').trim();
+  const certificationResponsible = String(currentData?.certificationResponsible || '').trim();
+  const selfEvalStartDate = String(currentData?.selfEvalStartDate || '').trim();
+  const externalEvalDate = String(currentData?.externalEvalDate || '').trim();
+
+  const evaluatorComplete = !!leadEvaluator && !!evaluator;
+  const responsibleComplete = !!centerManagement && !!certificationResponsible;
+
+  let versionInfo = '';
+  if (versionName || versionSource || versionDate) {
+    const bits = [];
+    if (versionName) bits.push(versionName);
+    if (versionSource) bits.push(versionSource);
+    if (versionDate) bits.push(versionDate);
+    versionInfo = bits.join(' · ');
+  }
+
+  return `
+    <div class="report-main-title">${escapeHtml(parts.title || 'Informe')}</div>
+    <div class="title-editor">
+      <div class="title-editor-col">
+        <div class="title-editor-row">
+          <label for="centerInput"><span class="label-highlight">Nombre del centro *</span></label>
+          <input id="centerInput" class="center-box" type="text" value="${escapeHtml(centerUpper)}">
+          ${versionInfo ? `<div class="current-version-note">Informe actual: ${escapeHtml(versionInfo)}</div>` : ''}
+        </div>
+        <div class="title-editor-row">
+          <label for="projectCodeInput"><span class="label-highlight">Código del proyecto *</span></label>
+          <input id="projectCodeInput" class="code-box" type="text" value="${escapeHtml(code)}">
+        </div>
+        <div class="top-area">
+          <div class="top-panels">
+            <details class="top-panel">
+              <summary>Equipo evaluador <span id="teamStatus" class="summary-status ${evaluatorComplete ? '' : 'pending'}">${evaluatorComplete ? 'Completado' : 'Pendiente'}</span></summary>
+              <div class="top-panel-body">
+                <div class="title-editor-row">
+                  <label for="leadEvaluatorInput">Evaluador jefe *</label>
+                  <select id="leadEvaluatorInput" class="code-box">
+                    <option value=""></option>
+                    <option value="Dña. Antonia Vázquez González" ${leadEvaluator === 'Dña. Antonia Vázquez González' ? 'selected' : ''}>Dña. Antonia Vázquez González</option>
+                    <option value="Dña. Bárbara Torres Verdu" ${leadEvaluator === 'Dña. Bárbara Torres Verdu' ? 'selected' : ''}>Dña. Bárbara Torres Verdu</option>
+                    <option value="D. Julio Piedra Cristobal" ${leadEvaluator === 'D. Julio Piedra Cristobal' ? 'selected' : ''}>D. Julio Piedra Cristobal</option>
+                    <option value="Dña. Leticia García Panal" ${leadEvaluator === 'Dña. Leticia García Panal' ? 'selected' : ''}>Dña. Leticia García Panal</option>
+                    <option value="D. Luis Carlos Valero Balboa" ${leadEvaluator === 'D. Luis Carlos Valero Balboa' ? 'selected' : ''}>D. Luis Carlos Valero Balboa</option>
+                    <option value="Dña. Mª del Mar Sánchez Gila" ${leadEvaluator === 'Dña. Mª del Mar Sánchez Gila' ? 'selected' : ''}>Dña. Mª del Mar Sánchez Gila</option>
+                    <option value="Dña. Mª Teresa Medina Duque" ${leadEvaluator === 'Dña. Mª Teresa Medina Duque' ? 'selected' : ''}>Dña. Mª Teresa Medina Duque</option>
+                    <option value="Dña. María José Castro Ruiz" ${leadEvaluator === 'Dña. María José Castro Ruiz' ? 'selected' : ''}>Dña. María José Castro Ruiz</option>
+                    <option value="D. Miiguel Prieto Domínguez" ${leadEvaluator === 'D. Miiguel Prieto Domínguez' ? 'selected' : ''}>D. Miiguel Prieto Domínguez</option>
+                    <option value="Dña. Olga Orozco Roldán" ${leadEvaluator === 'Dña. Olga Orozco Roldán' ? 'selected' : ''}>Dña. Olga Orozco Roldán</option>
+                    <option value="D. Rafael Romero de Castilla Gil" ${leadEvaluator === 'D. Rafael Romero de Castilla Gil' ? 'selected' : ''}>D. Rafael Romero de Castilla Gil</option>
+                    <option value="D. Raúl Pérez González" ${leadEvaluator === 'D. Raúl Pérez González' ? 'selected' : ''}>D. Raúl Pérez González</option>
+                    <option value="Dña. Sara Haydee Constenia" ${leadEvaluator === 'Dña. Sara Haydee Constenia' ? 'selected' : ''}>Dña. Sara Haydee Constenia</option>
+                    <option value="Dña. Victoria Eugenia Ruano García" ${leadEvaluator === 'Dña. Victoria Eugenia Ruano García' ? 'selected' : ''}>Dña. Victoria Eugenia Ruano García</option>
+                  </select>
+                </div>
+                <div class="title-editor-row">
+                  <label for="evaluatorInput">Evaluador</label>
+                  <select id="evaluatorInput" class="code-box">
+                    <option value=""></option>
+                    <option value="Dña. Antonia Vázquez González" ${evaluator === 'Dña. Antonia Vázquez González' ? 'selected' : ''}>Dña. Antonia Vázquez González</option>
+                    <option value="Dña. Bárbara Torres Verdu" ${evaluator === 'Dña. Bárbara Torres Verdu' ? 'selected' : ''}>Dña. Bárbara Torres Verdu</option>
+                    <option value="D. Julio Piedra Cristobal" ${evaluator === 'D. Julio Piedra Cristobal' ? 'selected' : ''}>D. Julio Piedra Cristobal</option>
+                    <option value="Dña. Leticia García Panal" ${evaluator === 'Dña. Leticia García Panal' ? 'selected' : ''}>Dña. Leticia García Panal</option>
+                    <option value="D. Luis Carlos Valero Balboa" ${evaluator === 'D. Luis Carlos Valero Balboa' ? 'selected' : ''}>D. Luis Carlos Valero Balboa</option>
+                    <option value="Dña. Mª del Mar Sánchez Gila" ${evaluator === 'Dña. Mª del Mar Sánchez Gila' ? 'selected' : ''}>Dña. Mª del Mar Sánchez Gila</option>
+                    <option value="Dña. Mª Teresa Medina Duque" ${evaluator === 'Dña. Mª Teresa Medina Duque' ? 'selected' : ''}>Dña. Mª Teresa Medina Duque</option>
+                    <option value="Dña. María José Castro Ruiz" ${evaluator === 'Dña. María José Castro Ruiz' ? 'selected' : ''}>Dña. María José Castro Ruiz</option>
+                    <option value="D. Miiguel Prieto Domínguez" ${evaluator === 'D. Miiguel Prieto Domínguez' ? 'selected' : ''}>D. Miiguel Prieto Domínguez</option>
+                    <option value="Dña. Olga Orozco Roldán" ${evaluator === 'Dña. Olga Orozco Roldán' ? 'selected' : ''}>Dña. Olga Orozco Roldán</option>
+                    <option value="D. Rafael Romero de Castilla Gil" ${evaluator === 'D. Rafael Romero de Castilla Gil' ? 'selected' : ''}>D. Rafael Romero de Castilla Gil</option>
+                    <option value="D. Raúl Pérez González" ${evaluator === 'D. Raúl Pérez González' ? 'selected' : ''}>D. Raúl Pérez González</option>
+                    <option value="Dña. Sara Haydee Constenia" ${evaluator === 'Dña. Sara Haydee Constenia' ? 'selected' : ''}>Dña. Sara Haydee Constenia</option>
+                    <option value="Dña. Victoria Eugenia Ruano García" ${evaluator === 'Dña. Victoria Eugenia Ruano García' ? 'selected' : ''}>Dña. Victoria Eugenia Ruano García</option>
+                  </select>
+                </div>
+              </div>
+            </details>
+            <details class="top-panel">
+              <summary>Responsables del centro <span id="centerStatus" class="summary-status ${responsibleComplete ? '' : 'pending'}">${responsibleComplete ? 'Completado' : 'Pendiente'}</span></summary>
+              <div class="top-panel-body">
+                <div class="title-editor-row">
+                  <label for="centerManagementInput">Gerencia del centro *</label>
+                  <input id="centerManagementInput" class="code-box" type="text" value="${escapeHtml(centerManagement)}">
+                </div>
+                <div class="title-editor-row">
+                  <label for="certificationResponsibleInput">Responsable del centro para el seguimiento de la certificación *</label>
+                  <input id="certificationResponsibleInput" class="code-box" type="text" value="${escapeHtml(certificationResponsible)}">
+                </div>
+              </div>
+            </details>
+          </div>
+          <div class="date-panel">
+            <div class="date-panel-head">Fechas del proceso</div>
+            <div class="date-panel-body">
+              <div class="title-editor-row">
+                <label for="selfEvalStartDateInput">Fecha de inicio de autoevaluación *</label>
+                <input id="selfEvalStartDateInput" type="date" value="${escapeHtml(selfEvalStartDate)}">
+              </div>
+              <div class="title-editor-row">
+                <label for="externalEvalDateInput">Fecha de evaluación externa *</label>
+                <input id="externalEvalDateInput" type="date" value="${escapeHtml(externalEvalDate)}">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="title-editor-col"></div>
+    </div>
+  `;
+}
+
+function syncEditableHeader() {
+  const centerInput = document.getElementById('centerInput');
+  const codeInput = document.getElementById('projectCodeInput');
+  const leadEvaluatorInput = document.getElementById('leadEvaluatorInput');
+  const evaluatorInput = document.getElementById('evaluatorInput');
+  const centerManagementInput = document.getElementById('centerManagementInput');
+  const certificationResponsibleInput = document.getElementById('certificationResponsibleInput');
+  const selfEvalStartDateInput = document.getElementById('selfEvalStartDateInput');
+  const externalEvalDateInput = document.getElementById('externalEvalDateInput');
+
+  const centerVal = String(centerInput?.value ?? currentData?.centerName ?? '').toUpperCase();
+  const codeVal = String(codeInput?.value ?? currentData?.projectCode ?? '');
+  const leadEvaluatorVal = String(leadEvaluatorInput?.value ?? currentData?.leadEvaluator ?? '');
+  const evaluatorVal = String(evaluatorInput?.value ?? currentData?.evaluator ?? '');
+  const centerManagementVal = String(centerManagementInput?.value ?? currentData?.centerManagement ?? '');
+  const certificationResponsibleVal = String(certificationResponsibleInput?.value ?? currentData?.certificationResponsible ?? '');
+  const selfEvalStartDateVal = String(selfEvalStartDateInput?.value ?? currentData?.selfEvalStartDate ?? '');
+  const externalEvalDateVal = String(externalEvalDateInput?.value ?? currentData?.externalEvalDate ?? '');
+
+  if (centerInput && centerInput.value !== centerVal) centerInput.value = centerVal;
+  if (codeInput && codeInput.value !== codeVal) codeInput.value = codeVal;
+  if (leadEvaluatorInput && leadEvaluatorInput.value !== leadEvaluatorVal) leadEvaluatorInput.value = leadEvaluatorVal;
+  if (evaluatorInput && evaluatorInput.value !== evaluatorVal) evaluatorInput.value = evaluatorVal;
+  if (centerManagementInput && centerManagementInput.value !== centerManagementVal) centerManagementInput.value = centerManagementVal;
+  if (certificationResponsibleInput && certificationResponsibleInput.value !== certificationResponsibleVal) certificationResponsibleInput.value = certificationResponsibleVal;
+  if (selfEvalStartDateInput && selfEvalStartDateInput.value !== selfEvalStartDateVal) selfEvalStartDateInput.value = selfEvalStartDateVal;
+  if (externalEvalDateInput && externalEvalDateInput.value !== externalEvalDateVal) externalEvalDateInput.value = externalEvalDateVal;
+
+  if (currentData) {
+    currentData.centerName = centerVal;
+    currentData.projectCode = codeVal;
+    currentData.leadEvaluator = leadEvaluatorVal;
+    currentData.evaluator = evaluatorVal;
+    currentData.centerManagement = centerManagementVal;
+    currentData.certificationResponsible = certificationResponsibleVal;
+    currentData.selfEvalStartDate = selfEvalStartDateVal;
+    currentData.externalEvalDate = externalEvalDateVal;
+  }
+}
+
+function syncEvaluationOutcomeFromSelect() {
+  const select = document.getElementById('outcomeSelect');
+  if (currentData && select) {
+    currentData.evaluationOutcome = select.value;
+    currentData.evaluationOutcomeManual = true;
+  }
+}
+
+function updateTopPanelStatuses() {
+  const leadEvaluator = String(document.getElementById('leadEvaluatorInput')?.value || currentData?.leadEvaluator || '').trim();
+  const evaluator = String(document.getElementById('evaluatorInput')?.value || currentData?.evaluator || '').trim();
+  const centerManagement = String(document.getElementById('centerManagementInput')?.value || currentData?.centerManagement || '').trim();
+  const certificationResponsible = String(document.getElementById('certificationResponsibleInput')?.value || currentData?.certificationResponsible || '').trim();
+
+  const teamStatus = document.getElementById('teamStatus');
+  const centerStatus = document.getElementById('centerStatus');
+
+  if (teamStatus) {
+    const ok = !!leadEvaluator && !!evaluator;
+    teamStatus.textContent = ok ? 'Completado' : 'Pendiente';
+    teamStatus.classList.toggle('pending', !ok);
+  }
+  if (centerStatus) {
+    const ok = !!centerManagement && !!certificationResponsible;
+    centerStatus.textContent = ok ? 'Completado' : 'Pendiente';
+    centerStatus.classList.toggle('pending', !ok);
+  }
+}
+
+
+document.addEventListener('input', (ev) => {
+  if (ev.target && ev.target.id === 'centerInput') {
+    clearMissingFieldHighlight(ev.target);
+    ev.target.value = String(ev.target.value || '').toUpperCase();
+    syncEditableHeader();
+    updateTopPanelStatuses();
+    saveLocalData();
+  }
+  if (ev.target && (ev.target.id === 'projectCodeInput' || ev.target.id === 'leadEvaluatorInput' || ev.target.id === 'evaluatorInput' || ev.target.id === 'centerManagementInput' || ev.target.id === 'certificationResponsibleInput' || ev.target.id === 'selfEvalStartDateInput' || ev.target.id === 'externalEvalDateInput')) {
+    clearMissingFieldHighlight(ev.target);
+    syncEditableHeader();
+    updateTopPanelStatuses();
+    saveLocalData();
+  }
+});
+
+document.addEventListener('change', (ev) => {
+  if (ev.target && (ev.target.id === 'leadEvaluatorInput' || ev.target.id === 'evaluatorInput' || ev.target.id === 'selfEvalStartDateInput' || ev.target.id === 'externalEvalDateInput')) {
+    clearMissingFieldHighlight(ev.target);
+    syncEditableHeader();
+    updateTopPanelStatuses();
+    saveLocalData();
+  }
+});
+
+
+
+document.addEventListener('blur', (ev) => {
+  if (ev.target && ev.target.id === 'centerInput') {
+    ev.target.value = String(ev.target.value || '').toUpperCase().trim();
+    syncEditableHeader();
+    updateTopPanelStatuses();
+    saveLocalData();
+  }
+  if (ev.target && (ev.target.id === 'projectCodeInput' || ev.target.id === 'centerManagementInput' || ev.target.id === 'certificationResponsibleInput')) {
+    ev.target.value = String(ev.target.value || '').trim();
+    syncEditableHeader();
+    updateTopPanelStatuses();
+    saveLocalData();
+  }
+}, true);
+
+
+function ensureImageReady(imgEl) {
+  return new Promise((resolve) => {
+    if (!imgEl) return resolve();
+    if (imgEl.complete && imgEl.naturalWidth) return resolve();
+    const done = () => resolve();
+    imgEl.addEventListener('load', done, { once:true });
+    imgEl.addEventListener('error', done, { once:true });
+    setTimeout(done, 2000);
+  });
+}
+
+function fileBlobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(String(reader.result || '')));
+    reader.addEventListener('error', () => reject(reader.error || new Error('No se pudo leer la imagen.')));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function imageDataFromElement(imgEl) {
+  if (!imgEl || !imgEl.naturalWidth || !imgEl.naturalHeight) return null;
+  const bundledLogo = window.CCVG_PDF_LOGOS?.[imgEl.id];
+  if (typeof bundledLogo === 'string' && bundledLogo.startsWith('data:image/')) {
+    return { dataUrl: bundledLogo, width: imgEl.naturalWidth, height: imgEl.naturalHeight };
+  }
+
+  const src = imgEl.currentSrc || imgEl.src || '';
+  if (src.startsWith('data:image/')) {
+    return { dataUrl: src, width: imgEl.naturalWidth, height: imgEl.naturalHeight };
+  }
+
+  try {
+    const response = await fetch(src);
+    if (!response.ok) throw new Error(`No se pudo cargar ${src}`);
+    const blob = await response.blob();
+    return {
+      dataUrl: await fileBlobToDataUrl(blob),
+      width: imgEl.naturalWidth,
+      height: imgEl.naturalHeight
+    };
+  } catch (e) {
+    console.warn('No se pudo leer el logo desde archivo.', e);
+    const isFileMode = window.location.protocol === 'file:';
+    throw new Error(
+      isFileMode
+        ? 'No se pueden leer los logos del PDF abriendo index.html directamente. Abre la aplicación con el lanzador local abrir_informe.command.'
+        : `No se pudo leer el logo del PDF: ${src}`
+    );
+  }
+}
+
+function bundledPngLogoData(id, width=2102, height=1469) {
+  const dataUrl = window.CCVG_PDF_LOGOS?.[id];
+  if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
+    return { dataUrl, width, height };
+  }
+  return null;
+}
+
+function fitBox(w, h, maxW, maxH) {
+  const ratio = Math.min(maxW / w, maxH / h);
+  return { w: w * ratio, h: h * ratio };
+}
+
+
+
+
+
+function formatMonthYearSpanish(dateValue) {
+  if (!dateValue) return '';
+  const d = new Date(dateValue + 'T12:00:00');
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+}
+
+function formatFullDateSpanish(dateValue) {
+  if (!dateValue) return '';
+  const d = new Date(dateValue + 'T12:00:00');
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function formatSignatureDateSpanish(date=new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getDate()} de ${d.toLocaleDateString('es-ES', { month: 'long' })} de ${d.getFullYear()}`;
+}
+
+
+function toTitleCaseSpanish(text='') {
+  const lower = String(text || '').toLocaleLowerCase('es-ES').trim();
+  const smallWords = new Set(['de','del','la','las','el','los','y','e','a','en','por','para','con','sin','o','u']);
+  return lower
+    .split(/(\s+)/)
+    .map((token, index) => {
+      if (/^\s+$/.test(token)) return token;
+      const normalized = token.replace(/[.,;:()]/g, '');
+      if (index > 0 && smallWords.has(normalized)) return token;
+      return token.replace(/(^|[\-\/(])([a-záéíóúüñ])/g, (match, sep, ch) => sep + ch.toLocaleUpperCase('es-ES'));
+    })
+    .join('');
+}
+
+async function generateCoverPdf() {
+  if (!currentData) return;
+  syncEvaluationOutcomeFromSelect();
+  const { jsPDF } = window.jspdf;
+
+  const doc = new jsPDF({ orientation:'p', unit:'mm', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 25.4;
+  let reportPageNumber = 2;
+
+  const imgPortada = document.getElementById('pdfLogoPortada');
+  const imgPacto = document.getElementById('pdfLogoPacto');
+  const imgConsejeria = document.getElementById('pdfLogoConsejeria');
+  const imgMinisterio = document.getElementById('pdfLogoMinisterio');
+  const imgAjunta = document.getElementById('pdfLogoAjunta');
+  const imgVgSinTexto = document.getElementById('pdfLogoVgSinTexto');
+
+  await Promise.all([
+    ensureImageReady(imgPortada),
+    ensureImageReady(imgPacto),
+    ensureImageReady(imgConsejeria),
+    ensureImageReady(imgMinisterio),
+    ensureImageReady(imgAjunta),
+    ensureImageReady(imgVgSinTexto)
+  ]);
+
+  const [
+    logoPortada,
+    logoPacto,
+    logoConsejeria,
+    logoMinisterio,
+    logoAjunta,
+    logoVgSinTexto
+  ] = await Promise.all([
+    imageDataFromElement(imgPortada),
+    imageDataFromElement(imgPacto),
+    imageDataFromElement(imgConsejeria),
+    imageDataFromElement(imgMinisterio),
+    imageDataFromElement(imgAjunta),
+    imageDataFromElement(imgVgSinTexto)
+  ]);
+
+  const pdfCode = String((document.getElementById('projectCodeInput')?.value || currentData.projectCode || '')).trim();
+  const pdfCenter = String((document.getElementById('centerInput')?.value || currentData.centerName || '')).toUpperCase().trim();
+  const leadEvaluator = String((document.getElementById('leadEvaluatorInput')?.value || currentData.leadEvaluator || '')).trim();
+  const evaluator = String((document.getElementById('evaluatorInput')?.value || currentData.evaluator || '')).trim();
+  const centerManagement = String((document.getElementById('centerManagementInput')?.value || currentData.centerManagement || '')).trim();
+  const certificationResponsible = String((document.getElementById('certificationResponsibleInput')?.value || currentData.certificationResponsible || '')).trim();
+  const selfEvalStartDate = String((document.getElementById('selfEvalStartDateInput')?.value || currentData.selfEvalStartDate || '')).trim();
+  const externalEvalDate = String((document.getElementById('externalEvalDateInput')?.value || currentData.externalEvalDate || '')).trim();
+  const pdfEvaluationOutcome = String((document.getElementById('outcomeSelect')?.value || currentData.evaluationOutcome || '')).trim();
+
+  function drawLowerLogos() {
+    const baseY = 270;
+    const gap = 10;
+    if (logoConsejeria && logoMinisterio && logoPacto) {
+      const fitCon = fitBox(logoConsejeria.width, logoConsejeria.height, 65, 16);
+      const fitMin = fitBox(logoMinisterio.width, logoMinisterio.height, 56, 14);
+      const fitPac = fitBox(logoPacto.width, logoPacto.height, 22, 14);
+
+      const totalWidth = fitCon.w + gap + fitMin.w + gap + fitPac.w;
+      const startX = (pageW - totalWidth) / 2;
+      const conX = startX;
+      const minX = conX + fitCon.w + gap;
+      const pacX = minX + fitMin.w + gap;
+
+      doc.addImage(logoConsejeria.dataUrl, 'PNG', conX, baseY, fitCon.w, fitCon.h);
+      doc.addImage(logoMinisterio.dataUrl, 'PNG', minX, baseY, fitMin.w, fitMin.h);
+      doc.addImage(logoPacto.dataUrl, 'PNG', pacX, baseY, fitPac.w, fitPac.h);
+    }
+  }
+
+  function drawReportHeaderFooter() {
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageW, pageH, 'F');
+    const topY = 9.8;
+
+    if (logoAjunta) {
+      const fitA = fitBox(logoAjunta.width, logoAjunta.height, 13.5, 10.5);
+      doc.addImage(logoAjunta.dataUrl, 'PNG', margin, topY + 1.5, fitA.w, fitA.h);
+    }
+
+    let vgX = pageW - margin;
+    if (logoVgSinTexto) {
+      const fitVG = fitBox(logoVgSinTexto.width, logoVgSinTexto.height, 29, 21);
+      vgX = pageW - margin - fitVG.w;
+      doc.addImage(logoVgSinTexto.dataUrl, 'PNG', vgX, topY - 0.8, fitVG.w, fitVG.h);
+    }
+
+    const textRight = vgX - 2.5;
+    doc.setFont('times', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(50, 50, 50);
+    doc.text('Informe de evaluación', textRight, topY + 4.2, { align: 'right' });
+    doc.text(pdfCode || '', textRight, topY + 8.4, { align: 'right' });
+    const centerHeaderLines = doc.splitTextToSize(pdfCenter || '', 74).slice(0, 2);
+    doc.text(centerHeaderLines, textRight, topY + 12.6, { align: 'right' });
+
+
+    if (logoPacto) {
+      const fitP = fitBox(logoPacto.width, logoPacto.height, 26, 18);
+      doc.addImage(logoPacto.dataUrl, 'PNG', (pageW - fitP.w) / 2, pageH - 20.5, fitP.w, fitP.h);
+    }
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Pág. ${reportPageNumber}`, pageW - margin, pageH - 10, { align: 'right' });
+  }
+
+  // Portada
+  if (logoPortada) {
+    const fit = fitBox(logoPortada.width, logoPortada.height, 85, 85);
+    doc.addImage(logoPortada.dataUrl, 'PNG', (pageW - fit.w)/2, 50, fit.w, fit.h);
+  }
+
+  const textStartY = 135;
+  const lineGap = 14;
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(16);
+  doc.setTextColor(0,0,0);
+  doc.text('INFORME DE EVALUACIÓN DEL PROYECTO', pageW/2, textStartY, {align:'center'});
+
+  if (pdfCode) {
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(16);
+    doc.setTextColor(118,65,162);
+    doc.text(pdfCode, pageW/2, textStartY + lineGap, {align:'center'});
+  }
+
+  if (pdfCenter) {
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(11);
+    doc.setTextColor(118,65,162);
+    doc.text(pdfCenter, pageW/2, textStartY + (lineGap * 2), {align:'center'});
+  }
+
+  if (logoPacto) {
+    const fitMid = fitBox(logoPacto.width, logoPacto.height, 22, 14);
+    doc.addImage(logoPacto.dataUrl, 'PNG', (pageW - fitMid.w)/2, 210, fitMid.w, fitMid.h);
+  }
+
+  drawLowerLogos();
+
+  // Segunda página de prueba
+  doc.addPage();
+  drawReportHeaderFooter();
+
+  let y = 92;
+  doc.setTextColor(40, 40, 40);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('ÍNDICE', margin, y);
+  y += 12;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  const indexStartY = y;
+  y += 8 * 4;
+
+  // Bloque "Equipo de evaluación" con diseño tipo tarjeta separada
+  const blockTop = pageH - 72;
+  const leftLineX = margin + 2;
+  const centerLineX = margin + 62;
+  const rightLineX = pageW - margin - 2;
+
+  doc.setDrawColor(118, 65, 162);
+  doc.setLineWidth(0.6);
+  doc.line(leftLineX, blockTop, leftLineX, blockTop + 38);
+  doc.line(centerLineX, blockTop, centerLineX, blockTop + 38);
+  doc.line(rightLineX, blockTop, rightLineX, blockTop + 38);
+
+  doc.setFont('times', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(118, 65, 162);
+  doc.text('Equipo de evaluación', margin + 12, blockTop + 17);
+
+  doc.setFont('times', 'normal');
+  doc.setFontSize(11);
+  let evalY = blockTop + 14;
+  if (leadEvaluator) {
+    doc.text(leadEvaluator, centerLineX + 10, evalY);
+    evalY += 12;
+  }
+  if (evaluator) {
+    doc.text(evaluator, centerLineX + 10, evalY);
+    evalY += 12;
+  }
+
+  // Tercera página
+  reportPageNumber = 3;
+  doc.addPage();
+  drawReportHeaderFooter();
+
+  const titleColor = [118, 65, 162];
+  let y3 = 46;
+
+  doc.setFont('times', 'normal');
+  doc.setTextColor(...titleColor);
+  doc.setFontSize(20);
+  doc.text('1. Alcance de la evaluación', margin, y3);
+  y3 += 16;
+
+  doc.setTextColor(40, 40, 40);
+  doc.setFontSize(11.5);
+  const pdfCenterTitle = toTitleCaseSpanish(pdfCenter);
+  const p1 = `El alcance de la evaluación corresponde al ${pdfCenterTitle}.`;
+  const p1Lines = doc.splitTextToSize(p1, pageW - margin * 2);
+  doc.text(p1Lines, margin, y3);
+  y3 += p1Lines.length * 6.2 + 14;
+
+  doc.setTextColor(...titleColor);
+  doc.setFontSize(20);
+  doc.text('2. Resumen del proceso', margin, y3);
+  y3 += 16;
+
+  doc.setTextColor(40, 40, 40);
+  doc.setFontSize(11.5);
+
+  const startMonthYear = formatMonthYearSpanish(selfEvalStartDate);
+  const fullExternalDate = formatFullDateSpanish(externalEvalDate);
+
+  const paragraphs = [
+    `El ${pdfCenterTitle} inició la autoevaluación en ${startMonthYear}, según los estándares propuestos en el programa de certificación de “Centros Comprometidos contra la Violencia de Género” y tomando como referencia el “Manual de estándares Centros Comprometidos contra la Violencia de Género”.`,
+    `Las personas responsables de la entidad relacionados con el proyecto son:`,
+    `Dirección Gerencia:`,
+    `${centerManagement}`,
+    `Responsable del centro para el seguimiento de la certificación:`,
+    `${certificationResponsible}`,
+    `Finalizada la autoevaluación, se realiza la visita de evaluación externa al centro el ${fullExternalDate}, según la agenda acordada con la Dirección de la entidad y disponible en su proyecto para su conocimiento.`,
+    `Los y las profesionales que conforman el equipo de evaluación tienen la cualificación para el desempeño de las actividades de evaluación según el Programa de Cualificación de Evaluadores de la Agencia de Calidad Sanitaria de Andalucía. No se ha declarado conflicto de intereses del equipo evaluador respecto a la entidad evaluada.`,
+    `La Agencia de Calidad Sanitaria de Andalucía garantiza el mantenimiento de la confidencialidad de la información obtenida durante el proceso de certificación y no asume ninguna responsabilidad relativa a la difusión de esta información por parte de los destinatarios de la misma. Cualquier manipulación de este informe está estrictamente prohibida.`
+  ];
+
+  paragraphs.forEach((p, i) => {
+    const lines = doc.splitTextToSize(p, pageW - margin * 2);
+    doc.text(lines, margin, y3);
+    y3 += lines.length * 5.8 + (i >= 1 && i <= 5 ? 2.5 : 5);
+  });
+
+  // Cuarta página
+  reportPageNumber = 4;
+  doc.addPage();
+  drawReportHeaderFooter();
+
+  let y4 = 46;
+  doc.setFont('times', 'normal');
+  doc.setTextColor(...titleColor);
+  doc.setFontSize(20);
+  doc.text('3. Resultados de la evaluación externa', margin, y4);
+  y4 += 16;
+
+  doc.setTextColor(40, 40, 40);
+  doc.setFontSize(11.5);
+
+  const page4Paragraphs = [
+    'Este informe se sustenta exclusivamente en la veracidad de los datos facilitados por el centro y los obtenidos en la visita de evaluación, garantizándose así la imparcialidad e independencia en la toma de decisiones.',
+    'La visita de evaluación tiene carácter puntual y muestral, por lo que pueden existir debilidades que no se han puesto de manifiesto y que el centro debería identificar y abordar dentro de sus procesos de mejora continua.',
+    'En la tabla siguiente se muestra el cumplimiento de estándares por carácter esencial o no (tabla nº 1) y por criterios del manual de estándares (tabla nº 2).'
+  ];
+
+  page4Paragraphs.forEach((p) => {
+    const lines = doc.splitTextToSize(p, pageW - margin * 2);
+    doc.text(lines, margin, y4);
+    y4 += lines.length * 5.8 + 8;
+  });
+
+  // Tabla 1: cumplimiento por carácter esencial o no
+  const allStandards = [];
+  (currentData?.criteria || []).forEach(c => (c.standards || []).forEach(s => allStandards.push(s)));
+
+  const isNoCumple = (val='') => String(val || '').toLowerCase().includes('no cumple');
+  const isEssential = (s) => String(s.essentiality || '').toLowerCase().includes('esencial');
+
+  const essentialStandards = allStandards.filter(isEssential);
+  const nonEssentialStandards = allStandards.filter(s => !isEssential(s));
+
+  function statsFor(list) {
+    const total = list.length;
+    const noCumplen = list.filter(s => isNoCumple(s.evaluation)).length;
+    const cumplen = total - noCumplen;
+    const percent = total ? Math.round((cumplen / total) * 100) : 0;
+    return { total, noCumplen, cumplen, percent };
+  }
+
+  const es = statsFor(essentialStandards);
+  const ne = statsFor(nonEssentialStandards);
+  const tt = statsFor(allStandards);
+
+  const tableX = margin + 2;
+  const tableY = y4 + 1.5;
+  const rowH = 8.8;
+  const colW = [31, 36, 34, 34, 32];
+  const headers = ['Carácter', 'Nº de estándares', 'No cumplen', 'Cumplen', 'Cumplen'];
+  const rows = [
+    ['Esenciales', String(es.total), String(es.noCumplen), String(es.cumplen), `${es.percent}%`],
+    ['No esenciales', String(ne.total), String(ne.noCumplen), String(ne.cumplen), `${ne.percent}%`],
+    ['Total', String(tt.total), String(tt.noCumplen), String(tt.cumplen), `${tt.percent}%`]
+  ];
+
+  const purple = [118, 65, 162];
+  const tableWidth = colW.reduce((a,b)=>a+b,0);
+
+  let x = tableX;
+  doc.setDrawColor(...purple);
+  doc.setLineWidth(0.4);
+
+  // vertical lines
+  const tableBottomY = tableY + rowH * (rows.length + 1);
+
+  // línea izquierda más gruesa
+  doc.setLineWidth(1.1);
+  doc.line(tableX, tableY, tableX, tableBottomY);
+
+  // líneas interiores finas
+  doc.setLineWidth(0.4);
+  x = tableX;
+  colW.forEach((w, idx) => {
+    x += w;
+    if (idx === colW.length - 1) {
+      doc.setLineWidth(1.1); // línea derecha más gruesa
+      doc.line(x, tableY, x, tableBottomY);
+      doc.setLineWidth(0.4);
+    } else {
+      doc.line(x, tableY, x, tableBottomY);
+    }
+  });
+
+  // header bottom line: solo en la primera columna
+  doc.line(tableX, tableY + rowH, tableX + colW[0], tableY + rowH);
+
+  // headers
+  doc.setFont('times', 'normal');
+  doc.setFontSize(11);
+  doc.setTextColor(...purple);
+  let hx = tableX;
+  headers.forEach((h, idx) => {
+    const tx = idx === 0 ? hx + 3 : hx + colW[idx] - 3;
+    doc.text(h, tx, tableY + 5.6, { align: idx === 0 ? 'left' : 'right' });
+    hx += colW[idx];
+  });
+
+  // rows
+  rows.forEach((row, rIdx) => {
+    let cx = tableX;
+    const y = tableY + rowH * (rIdx + 1) + 5.9;
+    row.forEach((cell, cIdx) => {
+      const tx = cIdx === 0 ? cx + 3 : cx + colW[cIdx] - 3;
+      if (cIdx === 0) {
+        doc.setTextColor(...purple);
+      } else {
+        doc.setTextColor(40, 40, 40);
+      }
+      doc.text(cell, tx, y, { align: cIdx === 0 ? 'left' : 'right' });
+      cx += colW[cIdx];
+    });
+  });
+
+  y4 = tableY + rowH * (rows.length + 1) + 14;
+  doc.setFont('times', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...purple);
+  doc.text('Tabla 1. Cumplimiento de estándares por carácter esencial o no.', tableX + 2, y4);
+
+  // Tabla 2: cumplimiento por criterios
+  const criteriaStats = (currentData?.criteria || []).map(c => {
+    const total = (c.standards || []).length;
+    const cumplen = (c.standards || []).filter(s => !isNoCumple(s.evaluation)).length;
+    const percent = total ? Math.round((cumplen / total) * 100) : 0;
+    return {
+      title: c.title || '',
+      total,
+      cumplen,
+      percent
+    };
+  });
+
+  const criterionColors = [
+    [214, 166, 185], // 1
+    [164, 140, 223], // 2
+    [76, 33, 167],   // 3
+    [59, 0, 177],    // 4
+    [214, 0, 53],    // 5
+    [227, 99, 99]    // 6
+  ];
+
+  const table2X = margin + 1;
+  const table2Y = y4 + 10;
+  const rowH2 = 8.8;
+  const colW2 = [86, 38, 24, 25];
+  const headers2 = ['Criterio', 'Nº Estándares', 'Cumplen', '% Cumplen'];
+  const table2Width = colW2.reduce((a,b)=>a+b,0);
+  const table2BottomY = table2Y + rowH2 * (criteriaStats.length + 1);
+
+  // vertical lines
+  doc.setDrawColor(...purple);
+  doc.setLineWidth(1.1);
+  doc.line(table2X, table2Y, table2X, table2BottomY);
+
+  let x2 = table2X;
+  colW2.forEach((w, idx) => {
+    x2 += w;
+    if (idx === 0 || idx === colW2.length - 1) {
+      doc.setLineWidth(1.1);
+      doc.line(x2, table2Y, x2, table2BottomY);
+      doc.setLineWidth(0.4);
+    } else {
+      doc.line(x2, table2Y, x2, table2BottomY);
+    }
+  });
+
+  // header bottom line only first column
+  doc.setLineWidth(0.4);
+  doc.line(table2X, table2Y + rowH2, table2X + colW2[0], table2Y + rowH2);
+
+  // headers
+  doc.setFont('times', 'normal');
+  doc.setFontSize(11);
+  doc.setTextColor(...purple);
+  let hx2 = table2X;
+  headers2.forEach((h, idx) => {
+    const tx = idx === 0 ? hx2 + 3 : hx2 + colW2[idx] - 3;
+    doc.text(h, tx, table2Y + 5.6, { align: idx === 0 ? 'left' : 'right' });
+    hx2 += colW2[idx];
+  });
+
+  // rows
+  criteriaStats.forEach((row, rIdx) => {
+    let cx2 = table2X;
+    const yy = table2Y + rowH2 * (rIdx + 1) + 5.9;
+
+    const color = criterionColors[rIdx] || purple;
+
+    // first column colored text and colored left small segment
+    doc.setTextColor(...color);
+    doc.text(row.title, cx2 + 3, yy, { align: 'left' });
+
+    // small colored segment on far-left for this row
+    doc.setDrawColor(...color);
+    doc.setLineWidth(2.0);
+    const segTop = table2Y + rowH2 * (rIdx + 1);
+    const segBottom = segTop + rowH2;
+    doc.line(table2X, segTop, table2X, segBottom);
+
+    cx2 += colW2[0];
+    doc.setTextColor(40, 40, 40);
+    doc.setLineWidth(0.4);
+    doc.setDrawColor(...purple);
+
+    doc.text(String(row.total), cx2 + colW2[1] - 3, yy, { align: 'right' });
+    cx2 += colW2[1];
+    doc.text(String(row.cumplen), cx2 + colW2[2] - 3, yy, { align: 'right' });
+    cx2 += colW2[2];
+    doc.text(`${row.percent} %`, cx2 + colW2[3] - 3, yy, { align: 'right' });
+  });
+
+  const caption2Y = table2BottomY + 14;
+  doc.setFont('times', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...purple);
+  doc.text('Tabla 2. Cumplimiento de estándares por criterios.', table2X + 2, caption2Y);
+
+  // ===== PÁGINA 5 EN ADELANTE: CRITERIOS =====
+  function criterionColor(code) {
+    const c = String(code || '');
+    if (c === '1') return [214, 166, 185];
+    if (c === '2') return [180, 156, 217];
+    if (c === '3') return [118, 65, 162];
+    if (c === '4') return [59, 0, 177];
+    if (c === '5') return [214, 0, 53];
+    if (c === '6') return [227, 99, 99];
+    return [118, 65, 162];
+  }
+
+  function criterionDisplayTitle(title='') {
+    return String(title || '')
+      .replace(/^\s*SM\s*/i, '')
+      .replace(/^\s*\d+\.\s*/, '')
+      .trim()
+      .toUpperCase() + ':';
+  }
+
+  function itemFails(item) {
+    return String(item?.evaluation || '').toLowerCase().includes('no cumple');
+  }
+
+  function standardCodeLabel(code='') {
+    const raw = String(code || '')
+      .replace(/^Estándar\s*/i, '')
+      .replace(/^E\.?\s*/i, '')
+      .trim()
+      .replace(/\.+$/,'');
+    return raw ? `E. ${raw}.` : 'E.';
+  }
+
+  function eoCodeLabel(code='') {
+    const raw = String(code || '')
+      .replace(/^Elemento orientativo\s*/i, '')
+      .replace(/^E\.?O\.?\s*/i, '')
+      .trim()
+      .replace(/\.+$/,'');
+    return raw ? `E.O. ${raw}.` : 'E.O.';
+  }
+
+  function addCriterionPageHeader(criterion, firstNeeded=20) {
+    reportPageNumber += 1;
+    doc.addPage();
+    drawReportHeaderFooter();
+
+    const cColor = criterionColor(criterion.code);
+    doc.setFont('times', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(...cColor);
+
+    const titleLines = doc.splitTextToSize(criterionDisplayTitle(criterion.title), pageW - margin * 2);
+    const titleH = titleLines.length * 10;
+    const bottomLimit = pageH - 25.4;
+
+    let y = 50;
+    if (y + titleH + firstNeeded > bottomLimit) {
+      y = Math.max(32, bottomLimit - (titleH + firstNeeded));
+    }
+
+    doc.text(titleLines, margin, y);
+    y += titleH;
+    return { y, color: cColor };
+  }
+
+  function ensureSpace(state, needed=14) {
+    const bottomLimit = pageH - 25.4;
+    if (state.y + needed <= bottomLimit) return state;
+    reportPageNumber += 1;
+    doc.addPage();
+    drawReportHeaderFooter();
+    state.y = 40;
+    return state;
+  }
+
+  function addParagraph(state, text, opts={}) {
+    if (!opts.skipEnsure) state = ensureSpace(state, 16);
+    doc.setFont('times', opts.italic ? 'italic' : (opts.bold ? 'bold' : 'normal'));
+    doc.setFontSize(opts.fontSize || 11.5);
+    doc.setTextColor(...(opts.color || [40,40,40]));
+    const lines = doc.splitTextToSize(String(text || ''), pageW - margin * 2);
+    doc.text(lines, margin, state.y);
+    state.y += lines.length * (opts.lineHeight || 5.8) + (opts.after || 6);
+    return state;
+  }
+
+  function addBulletList(state, items) {
+    items.forEach(item => {
+      state = ensureSpace(state, 14);
+      doc.setFont('times', 'normal');
+      doc.setFontSize(11.5);
+      doc.setTextColor(40, 40, 40);
+      const lines = doc.splitTextToSize(`• ${String(item || '')}`, pageW - margin * 2);
+      doc.text(lines, margin, state.y);
+      state.y += lines.length * 5.6 + 3.5;
+    });
+    return state;
+  }
+
+  function addEvaluationMatrix(state, item, opts={}) {
+    if (!opts.skipEnsure) state = ensureSpace(state, 70);
+    const leftX = margin + 5;
+    const tableW = pageW - margin * 2 - 10;
+    const colW = [42, 38, tableW - 80];
+    const topY = state.y + 1.5;
+    const headerH = 12;
+    const pad = 3.5;
+
+    const justLines = doc.splitTextToSize(String(item.justification || ''), colW[2] - pad * 2);
+    const bodyH = Math.max(48, justLines.length * 6 + 10);
+    const totalH = headerH + bodyH;
+    const purpleThin = [180, 156, 217];
+
+    if (!opts.skipEnsure) state = ensureSpace(state, totalH + 10);
+
+    doc.setDrawColor(...purpleThin);
+    doc.setLineWidth(1.2);
+    doc.line(leftX, topY, leftX, topY + totalH);
+    doc.line(leftX + tableW, topY, leftX + tableW, topY + totalH);
+
+    doc.setLineWidth(0.35);
+    doc.line(leftX + colW[0], topY, leftX + colW[0], topY + totalH);
+    doc.line(leftX + colW[0] + colW[1], topY, leftX + colW[0] + colW[1], topY + totalH);
+    doc.line(leftX, topY + headerH, leftX + tableW, topY + headerH);
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0,0,0);
+    doc.text('Autoevaluación', leftX + colW[0] / 2, topY + 7, { align:'center' });
+    doc.text('Evaluación', leftX + colW[0] + colW[1] / 2, topY + 7, { align:'center' });
+    doc.text('Justificación', leftX + colW[0] + colW[1] + colW[2] / 2, topY + 7, { align:'center' });
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(11.5);
+    const autoText = 'Aportado';
+    const evalText = String(item.evaluation || '');
+    doc.text(autoText, leftX + colW[0] / 2, topY + headerH + bodyH / 2, { align:'center' });
+    doc.text(evalText, leftX + colW[0] + colW[1] / 2, topY + headerH + bodyH / 2, { align:'center' });
+
+    doc.setFont('times', 'italic');
+    doc.text(justLines, leftX + colW[0] + colW[1] + pad, topY + headerH + 8);
+
+    state.y = topY + totalH + 14;
+    return state;
+  }
+
+  (currentData?.criteria || []).forEach((criterion) => {
+    const failingItems = [];
+    const allAreas = [];
+    const allStrengths = [];
+
+    (criterion.standards || []).forEach((s) => {
+      const sLabel = standardCodeLabel(s.code || '');
+      if (itemFails(s)) {
+        failingItems.push({
+          label: `${sLabel}: ${cleanLeadingPunctuation(s.description || '')}`,
+          evaluation: s.evaluation || '',
+          justification: s.justification || ''
+        });
+      }
+      (s.areasMejora || []).forEach(x => allAreas.push(`${sLabel}: ${String(x || '').trim()}`));
+      (s.fortalezas || []).forEach(x => allStrengths.push(`${sLabel}: ${String(x || '').trim()}`));
+
+      (s.eos || []).forEach((eo) => {
+        const eoLabel = eoCodeLabel(eo.code || '');
+        if (itemFails(eo)) {
+          failingItems.push({
+            label: `${eoLabel}: ${cleanLeadingPunctuation(eo.text || '')}`,
+            evaluation: eo.evaluation || '',
+            justification: eo.justification || ''
+          });
+        }
+        (eo.areasMejora || []).forEach(x => allAreas.push(`${eoLabel}: ${String(x || '').trim()}`));
+        (eo.fortalezas || []).forEach(x => allStrengths.push(`${eoLabel}: ${String(x || '').trim()}`));
+      });
+    });
+
+    let firstNeeded = 22;
+    if (!failingItems.length) {
+      firstNeeded = 22;
+    } else {
+      const firstItem = failingItems[0];
+      const labelLines = doc.splitTextToSize(String(firstItem.label || ''), pageW - margin * 2);
+      const estimatedLabelH = labelLines.length * 5.8 + 3;
+      const tableW = pageW - margin * 2 - 10;
+      const colW = [42, 38, tableW - 80];
+      const pad = 3.5;
+      const justLines = doc.splitTextToSize(String(firstItem.justification || ''), colW[2] - pad * 2);
+      const bodyH = Math.max(48, justLines.length * 6 + 10);
+      const estimatedMatrixH = 12 + bodyH + 14;
+      firstNeeded = estimatedLabelH + estimatedMatrixH + 14;
+    }
+
+    let state = addCriterionPageHeader(criterion, firstNeeded);
+
+    if (!failingItems.length) {
+      state = addParagraph(state, 'No se han descrito Estándares o elementos orientativos no cumplidos en este criterio.', { italic: true, after: 18, skipEnsure: true });
+    } else {
+      failingItems.forEach((item, idx) => {
+        const labelLines = doc.splitTextToSize(String(item.label || ''), pageW - margin * 2);
+        const estimatedLabelH = labelLines.length * 5.8 + 4;
+        const tableW = pageW - margin * 2 - 10;
+        const colW = [42, 38, tableW - 80];
+        const pad = 3.5;
+        const justLines = doc.splitTextToSize(String(item.justification || ''), colW[2] - pad * 2);
+        const bodyH = Math.max(48, justLines.length * 6 + 10);
+        const estimatedMatrixH = 12 + bodyH + 14;
+
+        const skipEnsure = idx === 0;
+        if (!skipEnsure) {
+          state = ensureSpace(state, estimatedLabelH + estimatedMatrixH + 16);
+        }
+
+        state = addParagraph(state, item.label, { italic: true, after: 3, skipEnsure });
+        state = addEvaluationMatrix(state, item, { skipEnsure });
+        state.y += 8;
+      });
+    }
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(17);
+    doc.setTextColor(...state.color);
+    state = ensureSpace(state, 24);
+    doc.text('Áreas de mejora', margin, state.y);
+    state.y += 10;
+
+    if (!allAreas.length) {
+      state = addParagraph(state, 'No se han descrito áreas de mejora en este criterio.', { italic: true, after: 16 });
+    } else {
+      state = addBulletList(state, allAreas);
+      state.y += 8;
+    }
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(17);
+    doc.setTextColor(...state.color);
+    state = ensureSpace(state, 24);
+    doc.text('Fortalezas', margin, state.y);
+    state.y += 10;
+
+    if (!allStrengths.length) {
+      state = addParagraph(state, 'No se han descrito fortalezas en este criterio.', { italic: true, after: 16 });
+    } else {
+      state = addBulletList(state, allStrengths);
+    }
+  });
+
+  function addHighlightedCriterionPage() {
+    const selectedCriterionCode = String(currentData?.highlightedCriterionCode || '').trim();
+    if (!selectedCriterionCode) return;
+
+    const selectedCriterion = (currentData?.criteria || []).find(c => String(c.code || '') === selectedCriterionCode);
+    const selectedCriterionName = String(selectedCriterion?.title || `Criterio ${selectedCriterionCode}`)
+      .replace(/^\s*SM\s*/i, '')
+      .replace(/^\s*\d+\.\s*/, '')
+      .trim()
+      .toUpperCase();
+    const selectedCriterionColor = criterionColor(selectedCriterionCode);
+    const criterionLogo = bundledPngLogoData(`pdfLogoCriterion${selectedCriterionCode}`);
+
+    reportPageNumber += 1;
+    doc.addPage();
+    drawReportHeaderFooter();
+
+    const text = `Por cumplirse todos los estándares y sumar el mayor número de fortalezas, el ${pdfCenterTitle} destaca en el criterio:`;
+    const textY = 62;
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9.5);
+    doc.setTextColor(0, 0, 0);
+    const textLines = doc.splitTextToSize(text, pageW - margin * 2);
+    doc.text(textLines, margin, textY);
+
+    if (criterionLogo) {
+      const fitHighlighted = fitBox(criterionLogo.width, criterionLogo.height, 128, 100);
+      const logoX = (pageW - fitHighlighted.w) / 2;
+      const logoY = textY + textLines.length * 4.6 + 30;
+      doc.addImage(criterionLogo.dataUrl, 'PNG', logoX, logoY, fitHighlighted.w, fitHighlighted.h);
+
+      doc.setFont('times', 'bold');
+      doc.setFontSize(28);
+      doc.setTextColor(...selectedCriterionColor);
+      doc.text(selectedCriterionName, pageW / 2, logoY + fitHighlighted.h + 20, { align: 'center' });
+    }
+  }
+
+  addHighlightedCriterionPage();
+
+  function normalizePdfParagraph(text) {
+    return String(text || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function addContinuationParagraph(state, text, opts={}) {
+    return addParagraph(state, normalizePdfParagraph(text), opts);
+  }
+
+  function addPlainContinuationParagraph(state, text, opts={}) {
+    const maxWidth = pageW - margin * 2;
+    const lines = doc.splitTextToSize(normalizePdfParagraph(text), maxWidth);
+    doc.setFont('times', opts.bold ? 'bold' : 'normal');
+    doc.setFontSize(11.5);
+    doc.setTextColor(40, 40, 40);
+    doc.text(lines, margin, state.y);
+    state.y += lines.length * 5.8;
+    state.y += (opts.after || 5);
+    return state;
+  }
+
+  function addContinuationRichLine(state, segments, opts={}) {
+    let x = margin;
+    doc.setFontSize(11.5);
+    doc.setTextColor(40, 40, 40);
+    segments.forEach(segment => {
+      const text = String(segment.text || '');
+      doc.setFont('times', segment.bold ? 'bold' : 'normal');
+      doc.text(text, x, state.y);
+      x += doc.getTextWidth(text);
+    });
+    state.y += 5.8 + (opts.after || 5);
+    return state;
+  }
+
+  function richWordsFromSegments(segments) {
+    return segments.flatMap(segment => {
+      const text = normalizePdfParagraph(segment.text);
+      if (!text) return [];
+      return text.split(' ').map(word => ({ text: word, bold: !!segment.bold }));
+    });
+  }
+
+  function richWordWidth(word) {
+    doc.setFont('times', word.bold ? 'bold' : 'normal');
+    doc.setFontSize(11.5);
+    return doc.getTextWidth(word.text);
+  }
+
+  function addContinuationRichParagraph(state, segments, opts={}) {
+    const maxWidth = pageW - margin * 2;
+    const spaceW = doc.getTextWidth(' ');
+    const lines = [];
+    let currentLine = [];
+    let currentWidth = 0;
+
+    richWordsFromSegments(segments).forEach(word => {
+      const wordW = richWordWidth(word);
+      const separatorW = currentLine.length ? spaceW : 0;
+
+      if (currentLine.length && currentWidth + separatorW + wordW > maxWidth) {
+        lines.push({ words: currentLine, width: currentWidth });
+        currentLine = [word];
+        currentWidth = wordW;
+      } else {
+        currentLine.push(word);
+        currentWidth += separatorW + wordW;
+      }
+    });
+
+    if (currentLine.length) lines.push({ words: currentLine, width: currentWidth });
+
+    lines.forEach((line, lineIndex) => {
+      const isLastLine = lineIndex === lines.length - 1;
+      const gaps = Math.max(0, line.words.length - 1);
+      const rawJustifiedSpaceW = gaps ? (maxWidth - line.words.reduce((sum, word) => sum + richWordWidth(word), 0)) / gaps : spaceW;
+      const justifiedSpaceW = (!isLastLine && rawJustifiedSpaceW <= spaceW * 2.4) ? rawJustifiedSpaceW : spaceW;
+      let x = margin;
+
+      line.words.forEach((word, wordIndex) => {
+        doc.setFont('times', word.bold ? 'bold' : 'normal');
+        doc.setFontSize(11.5);
+        doc.setTextColor(40, 40, 40);
+        doc.text(word.text, x, state.y);
+        x += richWordWidth(word);
+        if (wordIndex < line.words.length - 1) x += justifiedSpaceW;
+      });
+
+      state.y += 5.8;
+    });
+
+    state.y += (opts.after || 5);
+    return state;
+  }
+
+  function addBeltIaBoldParagraph(state) {
+    return addContinuationParagraph(
+      state,
+      'Para ello, deberá registrar en la aplicación Belt-IA- Violencia de Género los datos e informaciones que demuestren que las propuestas han recibido el tratamiento adecuado para llevarlas a cabo.'
+    );
+  }
+
+  function addBeltIaPendingParagraph(state) {
+    return addContinuationParagraph(
+      state,
+      'Para ello, deberá registrar en la aplicación Belt-IA- Violencia de Género nuevos datos e informaciones que demuestren que los estándares se cumplen.'
+    );
+  }
+
+  function addContinuationProcessPage() {
+    reportPageNumber += 1;
+    doc.addPage();
+    drawReportHeaderFooter();
+
+    const isPendingStandards = pdfEvaluationOutcome.toLowerCase().includes('pendiente');
+    console.info('Resultado final usado en PDF:', pdfEvaluationOutcome || '(sin resultado)', isPendingStandards ? 'pendiente' : 'supera');
+    let state = { y: 46 };
+
+    doc.setFont('times', 'normal');
+    doc.setTextColor(...titleColor);
+    doc.setFontSize(20);
+    doc.text('4. Continuación del proceso', margin, state.y);
+    state.y += 16;
+
+    if (isPendingStandards) {
+      state = addContinuationParagraph(state, 'El centro dispone de hasta un máximo de 90 días desde la comunicación del resultado para dar respuesta a los estándares que no han superado la evaluación, obligatoriamente en los estándares esenciales y de forma opcional los estándares no esenciales no cumplidos, debiendo alcanzar el mínimo establecido (24 estándares).', { skipEnsure: true });
+      state = addBeltIaPendingParagraph(state);
+      state = addContinuationParagraph(state, 'Del mismo modo, el centro deberá actualizar la información aportada en aquellos estándares esenciales y elementos orientativos imprescindibles que puedan comprometer el mantenimiento de la certificación.');
+      state = addContinuationParagraph(state, 'Una vez se finalice esta fase, el equipo evaluador revisará los datos e informaciones aportadas para determinar si ofrecen garantía de que los requisitos de certificación (porcentaje mínimo de estándares y estándares esenciales) se consiguen. Durante este periodo todos los canales de comunicación entre el centro y la Agencia de Calidad Sanitaria de Andalucía permanecerán abiertos.');
+      state = addContinuationParagraph(state, 'El centro puede alegar aquellos extremos del informe que comprometan la obtención de la certificación con los que se encuentre disconforme.', { after: 18 });
+    } else {
+      state = addContinuationParagraph(state, 'El centro debe abordar las acciones de mejora descritas en el punto 3, en los apartados correspondientes de cada criterio.', { skipEnsure: true });
+      state = addBeltIaBoldParagraph(state);
+      state = addContinuationParagraph(state, 'Del mismo modo, el centro deberá actualizar la información aportada en aquellos estándares esenciales y elementos orientativos imprescindibles que puedan comprometer el mantenimiento de la certificación.');
+      state = addContinuationParagraph(state, 'El plazo máximo para ello es hasta la realización de la evaluación de seguimiento que tendrá lugar a los 18 meses de ser concedida la certificación.');
+      state = addContinuationParagraph(state, 'El equipo evaluador revisará la información generada en esta fase para determinar si los datos e informaciones aportados por el centro ofrecen garantía de que se han llevado a cabo las acciones de mejora y de que los requisitos de certificación (porcentaje mínimo de estándares y estándares esenciales) se mantienen.');
+      state = addContinuationParagraph(state, 'Durante este periodo todos los canales de comunicación entre el centro y la Agencia de Calidad Sanitaria de Andalucía permanecerán abiertos.');
+      state = addContinuationParagraph(state, 'El centro puede alegar aquellos extremos del informe que comprometan la obtención de la certificación con los que se encuentre disconforme.', { after: 18 });
+    }
+
+    const signatureText = `En Sevilla, a ${formatSignatureDateSpanish(new Date())}`;
+    doc.setFont('times', 'normal');
+    doc.setFontSize(11.5);
+    doc.setTextColor(40, 40, 40);
+    doc.text(signatureText, margin, Math.max(state.y, pageH - 64));
+
+    return reportPageNumber;
+  }
+
+  // Escribir el índice con los números reales
+  const continuationPage = addContinuationProcessPage();
+  doc.setPage(2);
+  doc.setTextColor(40, 40, 40);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  const realIndexLines = [
+    { title: '1. Alcance de la evaluación', page: 3 },
+    { title: '2. Resumen del proceso', page: 3 },
+    { title: '3. Resultados de la evaluación externa', page: 4 },
+    { title: '4. Continuación del proceso', page: continuationPage }
+  ];
+  let realY = indexStartY;
+  const indexPageX = pageW - margin;
+  realIndexLines.forEach(item => {
+    const title = item.title;
+    const pageText = String(item.page);
+    doc.text(title, margin, realY);
+    doc.text(pageText, indexPageX, realY, { align: 'right' });
+
+    const titleW = doc.getTextWidth(title);
+    const pageWText = doc.getTextWidth(pageText);
+    const dotsX = margin + titleW + 2;
+    const dotsEndX = indexPageX - pageWText - 2;
+    const dotW = doc.getTextWidth('.');
+    const dotCount = Math.max(0, Math.floor((dotsEndX - dotsX) / dotW));
+    if (dotCount > 0) doc.text('.'.repeat(dotCount), dotsX, realY);
+
+    doc.link(margin, realY - 5, pageW - margin * 2, 7, { pageNumber: item.page });
+    realY += 8;
+  });
+
+  const safeName = (pdfCode || pdfCenter || 'informe')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  doc.save(`informe_${safeName || 'ccvg'}.pdf`);
+}
+
+
+
+
+function applyCurrentFilter() {
+  if (!currentData) return;
+  const filter = getCurrentFilter();
+  renderReport(currentData, filter);
+  refreshEvaluationSelectColors(document.getElementById('report'));
+}
+
+function getCurrentFilter() {
+  const checked = document.querySelector('input[name="filter"]:checked');
+  return checked ? checked.value : 'TODOS';
+}
+
+
+function formatPercentValue(value) {
+  const rounded = Math.round(value * 10) / 10;
+  return String(rounded).replace('.', ',') + ' %';
+}
+
+function outcomeOptionClass(value='') {
+  const v = String(value || '').toLowerCase().trim();
+  if (v === 'supera la evaluación') return 'status-supera';
+  return 'status-pendiente';
+}
+
+
+
+function summaryCriterionTitle(title='') {
+  const raw = String(title || '').trim();
+  const match = raw.match(/^(?:SM\s*)?(\d+)\.\s*(.*)$/i);
+  if (match) return `${match[1]}. ${match[2]}`.trim();
+  return raw.replace(/^SM\s*/i, '');
+}
+
+function criterionSummaryColor(code='', title='') {
+  const raw = `${String(code || '').trim()} ${String(title || '').trim()}`;
+  const match = raw.match(/(\d+)/);
+  const c = match ? match[1] : '';
+
+  if (c === '1') return '#ddb2c2';   // Formación
+  if (c === '2') return '#d4c2ee';   // Estrategia y proyección en el entorno
+  if (c === '3') return '#bb97d3';   // Detección
+  if (c === '4') return '#b8a1ea';   // Intervención
+  if (c === '5') return '#eda0b3';   // Coordinación
+  if (c === '6') return '#f4b1b1';   // Seguimiento
+
+  return '#d4c2ee';
+}
+
+function countCriterionEditableItems(criterion) {
+  const totals = { fortalezas: 0, areasMejora: 0 };
+  (criterion?.standards || []).forEach((standard) => {
+    totals.fortalezas += (standard.fortalezas || []).filter(x => String(x || '').trim()).length;
+    totals.areasMejora += (standard.areasMejora || []).filter(x => String(x || '').trim()).length;
+    (standard.eos || []).forEach((eo) => {
+      totals.fortalezas += (eo.fortalezas || []).filter(x => String(x || '').trim()).length;
+      totals.areasMejora += (eo.areasMejora || []).filter(x => String(x || '').trim()).length;
+    });
+  });
+  return totals;
+}
+
+function criterionStandardsAllPass(standardsList=[]) {
+  return standardsList.length > 0 && standardsList.every(s => !String(s.evaluation || '').toLowerCase().includes('no cumple'));
+}
+
+function chooseAutomaticHighlightedCriterion(criteria=[]) {
+  const ranked = criteria.map((criterion) => {
+    const standardsList = criterion.standards || [];
+    const counts = countCriterionEditableItems(criterion);
+    const standardsPass = standardsList.filter(s => !String(s.evaluation || '').toLowerCase().includes('no cumple')).length;
+    return {
+      code: String(criterion.code || '').trim(),
+      allPass: criterionStandardsAllPass(standardsList),
+      fortalezas: counts.fortalezas,
+      standardsPass,
+      totalStandards: standardsList.length
+    };
+  }).filter(x => x.code);
+
+  const fullPass = ranked
+    .filter(x => x.allPass)
+    .sort((a, b) => (b.fortalezas - a.fortalezas) || (b.totalStandards - a.totalStandards) || String(a.code).localeCompare(String(b.code), 'es'));
+
+  if (fullPass.length) return fullPass[0].code;
+  return '';
+}
+
+function ensureHighlightedCriterion(data, forceAuto=false) {
+  if (!data) return '';
+  const autoCode = chooseAutomaticHighlightedCriterion(data.criteria || []);
+  if (forceAuto || !data.highlightedCriterionManual || !data.highlightedCriterionCode) {
+    data.highlightedCriterionCode = autoCode;
+    data.highlightedCriterionManual = false;
+  }
+  return autoCode;
+}
+
+function getCriterionHighlightDetails(data, code) {
+  const criterion = (data?.criteria || []).find(c => String(c.code || '').trim() === String(code || '').trim());
+  if (!criterion) return null;
+  const standardsList = criterion.standards || [];
+  const passCount = standardsList.filter(s => !String(s.evaluation || '').toLowerCase().includes('no cumple')).length;
+  const passPercent = standardsList.length ? (passCount / standardsList.length) * 100 : 0;
+  const counts = countCriterionEditableItems(criterion);
+  return {
+    criterion,
+    passCount,
+    totalStandards: standardsList.length,
+    passPercent,
+    fortalezas: counts.fortalezas,
+    areasMejora: counts.areasMejora
+  };
+}
+
+function renderHighlightedCriterionSelector(data, autoCode) {
+  const selected = String(data?.highlightedCriterionCode || autoCode || '').trim();
+  const autoCriterion = (data?.criteria || []).find(c => String(c.code || '').trim() === String(autoCode));
+  const selectedIsAuto = selected && selected === String(autoCode || '') && !data?.highlightedCriterionManual;
+  const selectedDetails = getCriterionHighlightDetails(data, selected);
+  const options = (data?.criteria || []).map((criterion) => {
+    const code = String(criterion.code || '').trim();
+    const title = displayCriterionTitle(criterion.title || `Criterio ${code}`);
+    return `<option value="${escapeHtml(code)}" ${code === selected ? 'selected' : ''}>${escapeHtml(title)}</option>`;
+  }).join('');
+
+  const modeText = data?.highlightedCriterionManual ? 'Selección manual' : 'Selección automática';
+  const manualClass = data?.highlightedCriterionManual ? ' manual' : '';
+  const detailText = selectedDetails
+    ? `El criterio seleccionado cumple <strong>${formatPercentValue(selectedDetails.passPercent)}</strong> de sus estándares (${selectedDetails.passCount}/${selectedDetails.totalStandards}) y suma <strong>${selectedDetails.fortalezas}</strong> fortalezas.`
+    : 'Selecciona un criterio para completar este campo obligatorio.';
+  const selectionText = selectedIsAuto
+    ? 'Puedes cambiarlo manualmente si el evaluador considera que otro criterio debe destacarse.'
+    : autoCriterion
+      ? `El valor actual no coincide con la recomendación automática: ${escapeHtml(displayCriterionTitle(autoCriterion.title))}.`
+      : 'No hay recomendación automática: ningún criterio cumple todos sus estándares.';
+
+  return `
+    <div id="highlightCriterionPanel" class="highlight-criterion-panel">
+      <div class="highlight-criterion-row">
+        <label for="highlightCriterionSelect">Criterio destacado *</label>
+        <select id="highlightCriterionSelect" class="highlight-criterion-select">
+          <option value=""></option>
+          ${options}
+        </select>
+        <span class="highlight-criterion-mode${manualClass}">${modeText}</span>
+      </div>
+      <div class="highlight-criterion-help">${detailText}<br>${selectionText}</div>
+    </div>
+  `;
+}
+
+function renderHighlightedCriterionControl(data) {
+  const box = document.getElementById('highlightCriterionContainer');
+  if (!box || !data) return;
+  const autoHighlightedCriterion = ensureHighlightedCriterion(data);
+  box.style.display = 'block';
+  box.innerHTML = renderHighlightedCriterionSelector(data, autoHighlightedCriterion);
+
+  const highlightSelect = document.getElementById('highlightCriterionSelect');
+  if (highlightSelect) {
+    highlightSelect.addEventListener('change', () => {
+      if (!currentData) return;
+      currentData.highlightedCriterionCode = highlightSelect.value;
+      currentData.highlightedCriterionManual = true;
+      saveLocalData();
+      renderHighlightedCriterionControl(currentData);
+      clearMissingFieldHighlight('highlightCriterionSelect');
+    });
+  }
+}
+
+function computeSummaryStats(data) {
+  let totalStandards = 0, totalCumplen = 0, totalNoCumplen = 0;
+  let totalEsenciales = 0, totalNoEsenciales = 0;
+  let cumplenEsenciales = 0, cumplenNoEsenciales = 0;
+  let noCumplenEsenciales = 0, noCumplenNoEsenciales = 0;
+  let totalEOImprescindibles = 0, noCumplenEOImprescindibles = 0;
+
+  const criteriaCards = (data.criteria || []).map(c => {
+    const standardsList = c.standards || [];
+    const essentials = standardsList.filter(s => String(s.essentiality || '').toLowerCase().includes('esencial'));
+    const nonEssentials = standardsList.filter(s => !String(s.essentiality || '').toLowerCase().includes('esencial'));
+
+    const esencialesCumplen = essentials.filter(s => !String(s.evaluation || '').toLowerCase().includes('no cumple')).length;
+    const esencialesNoCumplen = essentials.filter(s => String(s.evaluation || '').toLowerCase().includes('no cumple')).length;
+    const noEsencialesCumplen = nonEssentials.filter(s => !String(s.evaluation || '').toLowerCase().includes('no cumple')).length;
+    const noEsencialesNoCumplen = nonEssentials.filter(s => String(s.evaluation || '').toLowerCase().includes('no cumple')).length;
+
+    standardsList.forEach(s => {
+      (s.eos || []).forEach(eo => {
+        const imp = String(eo.essentiality || '').toLowerCase().includes('imprescindible');
+        if (imp) {
+          totalEOImprescindibles += 1;
+          if (String(eo.evaluation || '').toLowerCase().includes('no cumple')) {
+            noCumplenEOImprescindibles += 1;
+          }
+        }
+      });
+    });
+
+    const total = standardsList.length;
+    const cumplen = esencialesCumplen + noEsencialesCumplen;
+    const noCumplen = esencialesNoCumplen + noEsencialesNoCumplen;
+    const editableCounts = countCriterionEditableItems(c);
+
+    totalStandards += total;
+    totalCumplen += cumplen;
+    totalNoCumplen += noCumplen;
+    totalEsenciales += essentials.length;
+    totalNoEsenciales += nonEssentials.length;
+    cumplenEsenciales += esencialesCumplen;
+    cumplenNoEsenciales += noEsencialesCumplen;
+    noCumplenEsenciales += esencialesNoCumplen;
+    noCumplenNoEsenciales += noEsencialesNoCumplen;
+
+    const cardBg = criterionSummaryColor(c.code, c.title);
+    return `<div class="criterion-summary-card c${c.code}" style="background:${cardBg};color:#4f4360;">
+      <div class="criterion-summary-title" style="color:#4f4360;">${escapeHtml(displayCriterionTitle(c.title))}</div>
+      <table class="criterion-summary-table" style="color:#4f4360;">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Total</th>
+            <th>Cumplen</th>
+            <th>No cumplen</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="row-total">
+            <td>Total estándares</td>
+            <td>${total}</td>
+            <td>${cumplen}</td>
+            <td>${noCumplen}</td>
+          </tr>
+          <tr class="${esencialesNoCumplen > 0 ? 'row-essential-alert' : ''}">
+            <td>Esenciales</td>
+            <td>${essentials.length}</td>
+            <td>${esencialesCumplen}</td>
+            <td>${esencialesNoCumplen}</td>
+          </tr>
+          <tr>
+            <td>No esenciales</td>
+            <td>${nonEssentials.length}</td>
+            <td>${noEsencialesCumplen}</td>
+            <td>${noEsencialesNoCumplen}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="criterion-summary-note">
+        <span><strong>Fortalezas</strong><strong>${editableCounts.fortalezas}</strong></span>
+        <span><strong>Áreas de mejora</strong><strong>${editableCounts.areasMejora}</strong></span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const percentCumplen = totalStandards ? (totalCumplen / totalStandards) * 100 : 0;
+  const autoOutcome = (totalCumplen >= Math.ceil(totalStandards * 0.8)) && (cumplenEsenciales === totalEsenciales)
+    ? 'Supera la evaluación'
+    : 'Pendiente de estándares';
+
+  return {
+    totalStandards, totalCumplen, totalNoCumplen,
+    totalEsenciales, totalNoEsenciales,
+    cumplenEsenciales, cumplenNoEsenciales,
+    noCumplenEsenciales, noCumplenNoEsenciales,
+    totalEOImprescindibles, noCumplenEOImprescindibles,
+    percentCumplen, autoOutcome, criteriaCards
+  };
+}
+
+function renderOutcomeStatus(stats) {
+  const box = document.getElementById('outcomeStatus');
+  if (!box) return;
+
+  let selected = stats.autoOutcome;
+  if (currentData && currentData.evaluationOutcomeManual && currentData.evaluationOutcome) {
+    selected = currentData.evaluationOutcome;
+  } else if (currentData) {
+    currentData.evaluationOutcome = stats.autoOutcome;
+    currentData.evaluationOutcomeManual = false;
+  }
+
+  const messages = [];
+  messages.push(`Se han cumplido <strong>${formatPercentValue(stats.percentCumplen)}</strong> de los estándares.`);
+  if (stats.noCumplenEsenciales > 0) {
+    messages.push(
+      stats.noCumplenEsenciales === 1
+        ? 'No se ha cumplido <strong>1 estándar esencial</strong>.'
+        : `No se han cumplido <strong>${stats.noCumplenEsenciales} estándares esenciales</strong>.`
+    );
+  }
+
+
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div class="outcome-card">
+      <div class="outcome-label">Resultado final de la evaluación</div>
+      <div class="outcome-row">
+        <select id="outcomeSelect" class="outcome-select ${outcomeOptionClass(selected)}">
+          <option value="Supera la evaluación" ${selected === 'Supera la evaluación' ? 'selected' : ''}>Supera la evaluación</option>
+          <option value="Pendiente de estándares" ${selected === 'Pendiente de estándares' ? 'selected' : ''}>Pendiente de estándares</option>
+        </select>
+        <div class="outcome-meta">${messages.join('<br>')}</div>
+      </div>
+    </div>
+  `;
+
+  const select = document.getElementById('outcomeSelect');
+  if (select) {
+    select.addEventListener('change', () => {
+      syncEvaluationOutcomeFromSelect();
+      select.classList.remove('status-supera', 'status-pendiente');
+      select.classList.add(outcomeOptionClass(select.value));
+      saveLocalData();
+    });
+  }
+}
+
+function renderAll() {
+  if (!currentData) return;
+  const filter = getCurrentFilter();
+  document.getElementById('reportTitle').innerHTML = renderStructuredTitle(currentData.meta.title || 'Informe');
+  syncEditableHeader();
+  updateTopPanelStatuses();
+  renderSummary(currentData);
+  renderHighlightedCriterionControl(currentData);
+  renderReport(currentData, filter);
+  refreshEvaluationSelectColors(document.getElementById('report'));
+}
+
+function renderSummary(data) {
+  const stats = computeSummaryStats(data);
+  const previousSummary = document.querySelector('#summary details');
+  const keepSummaryOpen = !!previousSummary?.open;
+  renderOutcomeStatus(stats);
+
+  document.getElementById('summary').style.display = 'block';
+  document.getElementById('summary').innerHTML = `
+    <details ${keepSummaryOpen ? 'open' : ''}>
+      <summary>Resumen</summary>
+      <div class="summary-content">
+        <div class="summary-total">
+          <div class="summary-metric">
+            <div class="summary-metric-title">Total estándares</div>
+            <div class="summary-metric-value">${stats.totalStandards}</div>
+            <div class="summary-metric-breakdown">
+              <span><strong>Esenciales</strong><strong>${stats.totalEsenciales}</strong></span>
+              <span><strong>No esenciales</strong><strong>${stats.totalNoEsenciales}</strong></span>
+            </div>
+          </div>
+          <div class="summary-metric ok">
+            <div class="summary-metric-title">Cumplen</div>
+            <div class="summary-metric-value">${stats.totalCumplen}</div>
+            <div class="summary-metric-breakdown">
+              <span><strong>Esenciales</strong><strong>${stats.cumplenEsenciales}</strong></span>
+              <span><strong>No esenciales</strong><strong>${stats.cumplenNoEsenciales}</strong></span>
+            </div>
+          </div>
+          <div class="summary-metric bad">
+            <div class="summary-metric-title">No cumplen</div>
+            <div class="summary-metric-value">${stats.totalNoCumplen}</div>
+            <div class="summary-metric-breakdown">
+              <span><strong>Esenciales</strong><strong>${stats.noCumplenEsenciales}</strong></span>
+              <span><strong>No esenciales</strong><strong>${stats.noCumplenNoEsenciales}</strong></span>
+            </div>
+          </div>
+        </div>
+        <div class="criteria-summary-grid">${stats.criteriaCards}</div>
+      </div>
+    </details>
+  `;
+}
+
+
+function displayCriterionTitle(title='') {
+  const raw = String(title || '').trim();
+  const match = raw.match(/^(?:SM\s*)?(\d+)\.\s*(.*)$/i);
+  if (match) return `${match[1]}. ${match[2]}`.trim();
+  return raw.replace(/^SM\s*/i, '');
+}
+
+function renderReport(data, filter) {
+  const out = [];
+  data.criteria.forEach(c => {
+    const standards = c.standards.filter(s => shouldRenderStandard(s, filter));
+    if (!standards.length) return;
+
+    out.push(`
+      <section class="criterion collapsed">
+        <div class="criterion-head c${c.code}"><h3>${escapeHtml(displayCriterionTitle(c.title))}</h3></div>
+        <div class="criterion-body">
+          ${standards.map(renderStandard).join('')}
+        </div>
+      </section>
+    `);
+  });
+  document.getElementById('report').className = '';
+  document.getElementById('report').innerHTML = out.join('') || '<div class="panel placeholder">No hay resultados con el filtro seleccionado.</div>';
+  autosizeJustificationTextareas(document.getElementById('report'));
+  autosizeEditableList(document.getElementById('report'));
+}
+
+function renderStandard(s) {
+  const desc = cleanLeadingPunctuation(s.description || '');
+  const eoBlocks = (s.eos || []).map(eo => `
+    <div class="eo-item">
+      <div class="eo-title-line">
+        <span class="eo-code">Elemento orientativo ${escapeHtml(eo.code || '')}</span>
+        ${eo.essentiality ? `<span class="badge ${badgeClass(eo.essentiality)}">${escapeHtml(eo.essentiality)}</span>` : ''}
+      </div>
+      ${eo.text ? `<div class="eo-text">${escapeHtml(cleanLeadingPunctuation(eo.text || ''))}</div>` : ''}
+      ${renderEvaluationTable(eo)}
+      ${renderSection('Áreas de mejora', eo.areasMejora, eo.code || '')}
+      ${renderSection('Fortalezas', eo.fortalezas, eo.code || '')}
+    </div>
+  `).join('');
+
+  return `
+    <article class="standard-card">
+      <div class="standard-title-wrap">
+        <div class="standard-title-line">
+          <h4 class="standard-heading">Estándar ${escapeHtml((s.code || '').replace(/^Estándar\s*/i,''))}</h4>
+          ${s.essentiality ? `<span class="badge ${badgeClass(s.essentiality)}">${escapeHtml(s.essentiality)}</span>` : ''}
+        </div>
+        ${desc ? `<div class="standard-description">${escapeHtml(desc)}</div>` : ''}
+      </div>
+
+      <div class="standard-main-box">
+        ${renderEvaluationTable(s)}
+        ${renderSection('Áreas de mejora', s.areasMejora, s.code || '')}
+        ${renderSection('Fortalezas', s.fortalezas, s.code || '')}
+      </div>
+
+      ${(s.eos && s.eos.length) ? `<div class="section-title">Elementos orientativos</div>${eoBlocks}` : ''}
+    </article>
+  `;
+}
+
+
+function evaluationOptionClass(value='') {
+  const v = String(value || '').toLowerCase().trim();
+  if (v === 'cumple') return 'status-cumple';
+  if (v === 'no cumple') return 'status-nocumple';
+  if (v === 'no aplica') return 'status-noaplica';
+  return 'status-cumple';
+}
+
+function updateEvaluationByCode(code, value) {
+  if (!currentData || !code) return false;
+  for (const criterion of (currentData.criteria || [])) {
+    for (const standard of (criterion.standards || [])) {
+      if (String(standard.code || '') === String(code)) {
+        standard.evaluation = value;
+        return true;
+      }
+      for (const eo of (standard.eos || [])) {
+        if (String(eo.code || '') === String(code)) {
+          eo.evaluation = value;
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function applyEvaluationSelectStyle(sel) {
+  if (!sel) return;
+  const value = String(sel.value || 'Cumple').trim();
+  const pill = sel.closest('.evaluation-pill');
+  if (!pill) return;
+  pill.classList.remove('status-cumple', 'status-nocumple', 'status-noaplica');
+  pill.classList.add(evaluationOptionClass(value));
+}
+
+function refreshEvaluationSelectColors(root=document) {
+  root.querySelectorAll('.evaluation-select').forEach((sel) => applyEvaluationSelectStyle(sel));
+}
+
+function handleEvaluationSelectChange(sel) {
+  if (!sel) return;
+  const code = sel.getAttribute('data-code') || '';
+  const value = String(sel.value || 'Cumple');
+  updateEvaluationByCode(code, value);
+  applyEvaluationSelectStyle(sel);
+  try { saveLocalData(); } catch (e) {}
+  if (typeof renderSummary === 'function' && currentData) {
+    renderSummary(currentData);
+  }
+}
+
+function renderEvaluationTable(item) {
+  if (!item.evaluation && !item.justification && !item.autoevaluacion) return '';
+  const evalValue = String(item.evaluation || 'Cumple');
+  return `
+    <table class="eval-table">
+      <colgroup>
+        <col class="col-autoeval">
+        <col class="col-evaluacion">
+        <col class="col-justificacion">
+      </colgroup>
+      <tr>
+        <th>Autoevaluación</th>
+        <th>Evaluación</th>
+        <th>Justificación</th>
+      </tr>
+      <tr>
+        <td>${escapeHtml(item.autoevaluacion || '')}</td>
+        <td>
+          <div class="evaluation-pill ${evaluationOptionClass(evalValue)}">
+            <select class="evaluation-select" data-code="${escapeHtml(item.code || '')}" onchange="handleEvaluationSelectChange(this)" oninput="handleEvaluationSelectChange(this)">
+              <option value="Cumple" ${evalValue === 'Cumple' ? 'selected' : ''}>Cumple</option>
+              <option value="No cumple" ${evalValue === 'No cumple' ? 'selected' : ''}>No cumple</option>
+              <option value="No aplica" ${evalValue === 'No aplica' ? 'selected' : ''}>No aplica</option>
+            </select>
+          </div>
+        </td>
+        <td>
+          <textarea
+            class="justification-input"
+            data-code="${escapeHtml(item.code || '')}"
+            placeholder="Editar justificación"
+            rows="2"
+          >${escapeHtml(item.justification || '')}</textarea>
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
+function renderSection(title, items=[], codePrefix='') {
+  const key = title.toLowerCase().includes('fortaleza') ? 'fortalezas' : 'areasMejora';
+  return `
+    <div class="section-title">${title}</div>
+    ${items.length
+      ? `<div class="editable-list">${items.map((x, idx) => `<textarea class="editable-list-item" data-section-key="${key}" data-parent-code="${escapeHtml(codePrefix || '')}" data-item-index="${idx}">${escapeHtml(x)}</textarea>`).join('')}</div>`
+      : `<div class="muted small">No se han descrito ${title.toLowerCase()}.</div>`
+    }
+  `;
+}
+
+
+
+function autosizeJustificationTextareas(root=document) {
+  root.querySelectorAll('.justification-input').forEach((ta) => {
+    ta.style.height = 'auto';
+    ta.style.overflowY = 'hidden';
+    ta.style.height = Math.max(44, ta.scrollHeight + 2) + 'px';
+  });
+}
+
+
+function updateArrayItemByCode(code, key, index, value) {
+  if (!currentData || !code || !key) return false;
+  const idx = Number(index);
+  if (Number.isNaN(idx)) return false;
+
+  for (const criterion of (currentData.criteria || [])) {
+    for (const standard of (criterion.standards || [])) {
+      if (String(standard.code || '') === String(code)) {
+        if (Array.isArray(standard[key]) && idx >= 0 && idx < standard[key].length) {
+          standard[key][idx] = value;
+          return true;
+        }
+      }
+      for (const eo of (standard.eos || [])) {
+        if (String(eo.code || '') === String(code)) {
+          if (Array.isArray(eo[key]) && idx >= 0 && idx < eo[key].length) {
+            eo[key][idx] = value;
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function autosizeEditableList(root=document) {
+  root.querySelectorAll('.editable-list-item').forEach((ta) => {
+    ta.style.height = 'auto';
+    ta.style.overflowY = 'hidden';
+    ta.style.height = Math.max(44, ta.scrollHeight + 2) + 'px';
+  });
+}
+
+
+function updateJustificationByCode(code, value) {
+  if (!currentData || !code) return false;
+
+  for (const criterion of (currentData.criteria || [])) {
+    for (const standard of (criterion.standards || [])) {
+      if (String(standard.code || '') === String(code)) {
+        standard.justification = value;
+        return true;
+      }
+      for (const eo of (standard.eos || [])) {
+        if (String(eo.code || '') === String(code)) {
+          eo.justification = value;
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+document.addEventListener('input', (ev) => {
+  if (ev.target && ev.target.classList && ev.target.classList.contains('justification-input')) {
+    const code = ev.target.getAttribute('data-code') || '';
+    updateJustificationByCode(code, ev.target.value);
+    ev.target.style.height = 'auto';
+    ev.target.style.overflowY = 'hidden';
+    ev.target.style.height = Math.max(44, ev.target.scrollHeight + 2) + 'px';
+  }
+  if (ev.target && ev.target.classList && ev.target.classList.contains('editable-list-item')) {
+    const code = ev.target.getAttribute('data-parent-code') || '';
+    const key = ev.target.getAttribute('data-section-key') || '';
+    const index = ev.target.getAttribute('data-item-index') || '0';
+    updateArrayItemByCode(code, key, index, ev.target.value);
+    ev.target.style.height = 'auto';
+    ev.target.style.overflowY = 'hidden';
+    ev.target.style.height = Math.max(44, ev.target.scrollHeight + 2) + 'px';
+  }
+});
+
+function badgeClass(text='') {
+  const t = text.toLowerCase();
+  if (t.includes('esencial') || t.includes('imprescindible')) return t.includes('imprescindible') ? 'imprescindible' : 'esencial';
+  if (t.includes('no cumple')) return 'no-cumple';
+  if (t.includes('parcial')) return 'parcial';
+  if (t.includes('cumple')) return 'cumple';
+  return '';
+}
+function escapeHtml(str='') {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+
+</script>
+            <button id="backTopBtn" class="back-top" type="button" title="Volver arriba">↑ Arriba</button>
+
+<script>
+(function () {
+  function forceScrollTop() {
+    try { window.scrollTo({ top: 0, left: 0, behavior: 'smooth' }); } catch (e) {}
+    try { window.scrollTo(0, 0); } catch (e) {}
+    try { document.documentElement.scrollTop = 0; } catch (e) {}
+    try { document.body.scrollTop = 0; } catch (e) {}
+    try {
+      const scrollRoot = document.scrollingElement || document.documentElement || document.body;
+      if (scrollRoot) scrollRoot.scrollTop = 0;
+    } catch (e) {}
+    document.querySelectorAll('*').forEach(el => {
+      try {
+        const st = getComputedStyle(el);
+        if ((st.overflowY === 'auto' || st.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+          el.scrollTop = 0;
+        }
+      } catch (e) {}
+    });
+  }
+
+  const btn = document.getElementById('backTopBtn');
+  if (btn) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      forceScrollTop();
+    }, true);
+  }
+})();
+
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    getAuthConfig();
+  } catch (e) {
+    showLoginConfigError(e.message || 'No se ha podido leer la configuración de acceso.');
+    return;
+  }
+  try {
+    const savedAuth = localStorage.getItem('ccvg_auth_ok');
+    const savedRemember = localStorage.getItem(LOGIN_REMEMBER_STORAGE_KEY);
+    const storedUser = localStorage.getItem(LOGIN_USER_STORAGE_KEY) || '';
+    const rememberEl = document.getElementById('loginRemember');
+    updateUserNameDisplay(storedUser || '');
+    if (rememberEl) {
+      rememberEl.checked = savedRemember !== '0';
+    }
+    if (savedAuth === '1') {
+      openApp();
+    }
+  } catch (e) {}
+});
+</script>
+
+
+  <img id="pdfLogoAjunta" src="logos/logo_Ajunta.png" alt="" style="display:none">
+  <img id="pdfLogoVgSinTexto" src="logos/logo_vg_sintexto.png" alt="" style="display:none">
+</body>
+</html>
