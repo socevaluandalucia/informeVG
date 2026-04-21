@@ -2465,6 +2465,8 @@ async function generateCoverPdf() {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 25.4;
+  const pdfContentTop = 40;
+  const pdfContentBottom = pageH - 40;
   let reportPageNumber = 2;
 
   const imgPortada = document.getElementById('pdfLogoPortada');
@@ -2974,11 +2976,11 @@ async function generateCoverPdf() {
 
     const titleLines = doc.splitTextToSize(criterionDisplayTitle(criterion.title), pageW - margin * 2);
     const titleH = titleLines.length * 10;
-    const bottomLimit = pageH - 25.4;
+    const bottomLimit = pdfContentBottom;
 
     let y = 50;
     if (y + titleH + firstNeeded > bottomLimit) {
-      y = Math.max(32, bottomLimit - (titleH + firstNeeded));
+      y = Math.max(pdfContentTop, bottomLimit - (titleH + firstNeeded));
     }
 
     doc.text(titleLines, margin, y);
@@ -2987,12 +2989,12 @@ async function generateCoverPdf() {
   }
 
   function ensureSpace(state, needed=14) {
-    const bottomLimit = pageH - 25.4;
+    const bottomLimit = pdfContentBottom;
     if (state.y + needed <= bottomLimit) return state;
     reportPageNumber += 1;
     doc.addPage();
     drawReportHeaderFooter();
-    state.y = 40;
+    state.y = pdfContentTop;
     return state;
   }
 
@@ -3051,6 +3053,7 @@ async function generateCoverPdf() {
     const maxWidth = pageW - margin * 2;
     const lineHeight = opts.lineHeight || 5.8;
     const lines = doc.splitTextToSize(String(text || ''), maxWidth);
+    state = ensureSpace(state, lines.length * lineHeight + (opts.after || 6));
     drawJustifiedPdfParagraph(lines, margin, state.y, maxWidth, lineHeight, false);
     state.y += lines.length * lineHeight + (opts.after || 6);
     return state;
@@ -3058,11 +3061,14 @@ async function generateCoverPdf() {
 
   function addBulletList(state, items) {
     items.forEach(item => {
-      state = ensureSpace(state, 14);
       doc.setFont('times', 'normal');
       doc.setFontSize(11.5);
       doc.setTextColor(40, 40, 40);
       const itemText = String(item || '').trim();
+      const bulletGap = 5;
+      const textWidth = pageW - margin * 2 - bulletGap;
+      const lines = doc.splitTextToSize(itemText, textWidth);
+      state = ensureSpace(state, Math.max(14, lines.length * 5.6 + 3.5));
       const nextY = drawBulletItem(itemText, margin, state.y, pageW - margin * 2, 5.6);
       state.y = nextY + 3.5;
     });
@@ -3070,57 +3076,66 @@ async function generateCoverPdf() {
   }
 
   function addEvaluationMatrix(state, item, opts={}) {
-    if (!opts.skipEnsure) state = ensureSpace(state, 70);
     const leftX = margin + 5;
     const tableW = pageW - margin * 2 - 10;
     const colW = [42, 38, tableW - 80];
-    const topY = state.y + 1.5;
     const headerH = 12;
     const pad = 3.5;
 
-    const justLines = doc.splitTextToSize(String(item.justification || ''), colW[2] - pad * 2);
-    const bodyH = Math.max(48, justLines.length * 6 + 10);
-    const totalH = headerH + bodyH;
+    let remainingLines = doc.splitTextToSize(String(item.justification || ''), colW[2] - pad * 2);
+    if (!remainingLines.length) remainingLines = [''];
     const purpleThin = [180, 156, 217];
+    let firstChunk = true;
 
-    if (!opts.skipEnsure) state = ensureSpace(state, totalH + 10);
+    while (remainingLines.length) {
+      const estimatedBodyH = Math.max(48, Math.min(remainingLines.length, 12) * 6 + 10);
+      state = ensureSpace(state, headerH + estimatedBodyH + 14);
 
-    doc.setDrawColor(...purpleThin);
-    doc.setLineWidth(1.2);
-    doc.line(leftX, topY, leftX, topY + totalH);
-    doc.line(leftX + tableW, topY, leftX + tableW, topY + totalH);
+      const topY = state.y + 1.5;
+      const availableBodyH = Math.max(16, pdfContentBottom - topY - headerH);
+      const maxLines = Math.max(1, Math.floor((availableBodyH - 10) / 6));
+      const chunkLines = remainingLines.splice(0, maxLines);
+      const bodyH = Math.max(48, chunkLines.length * 6 + 10);
+      const totalH = headerH + bodyH;
 
-    doc.setLineWidth(0.35);
-    doc.line(leftX + colW[0], topY, leftX + colW[0], topY + totalH);
-    doc.line(leftX + colW[0] + colW[1], topY, leftX + colW[0] + colW[1], topY + totalH);
-    doc.line(leftX, topY + headerH, leftX + tableW, topY + headerH);
+      doc.setDrawColor(...purpleThin);
+      doc.setLineWidth(1.2);
+      doc.line(leftX, topY, leftX, topY + totalH);
+      doc.line(leftX + tableW, topY, leftX + tableW, topY + totalH);
 
-    doc.setFont('times', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(0,0,0);
-    doc.text('Autoevaluación', leftX + colW[0] / 2, topY + 7, { align:'center' });
-    doc.text('Evaluación', leftX + colW[0] + colW[1] / 2, topY + 7, { align:'center' });
-    doc.text('Justificación', leftX + colW[0] + colW[1] + colW[2] / 2, topY + 7, { align:'center' });
+      doc.setLineWidth(0.35);
+      doc.line(leftX + colW[0], topY, leftX + colW[0], topY + totalH);
+      doc.line(leftX + colW[0] + colW[1], topY, leftX + colW[0] + colW[1], topY + totalH);
+      doc.line(leftX, topY + headerH, leftX + tableW, topY + headerH);
 
-    doc.setFont('times', 'normal');
-    doc.setFontSize(11.5);
-    const autoText = 'Aportado';
-    const evalText = String(item.evaluation || '');
-    doc.text(autoText, leftX + colW[0] / 2, topY + headerH + bodyH / 2, { align:'center' });
-    doc.text(evalText, leftX + colW[0] + colW[1] / 2, topY + headerH + bodyH / 2, { align:'center' });
+      doc.setFont('times', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(0,0,0);
+      doc.text('Autoevaluación', leftX + colW[0] / 2, topY + 7, { align:'center' });
+      doc.text('Evaluación', leftX + colW[0] + colW[1] / 2, topY + 7, { align:'center' });
+      doc.text(firstChunk ? 'Justificación' : 'Justificación (continuación)', leftX + colW[0] + colW[1] + colW[2] / 2, topY + 7, { align:'center' });
 
-    doc.setFont('times', 'italic');
-    drawJustifiedPdfParagraph(
-      justLines,
-      leftX + colW[0] + colW[1] + pad,
-      topY + headerH + 8,
-      colW[2] - pad * 2,
-      6,
-      true,
-      8
-    );
+      doc.setFont('times', 'normal');
+      doc.setFontSize(11.5);
+      const autoText = firstChunk ? 'Aportado' : '';
+      const evalText = firstChunk ? String(item.evaluation || '') : '';
+      if (autoText) doc.text(autoText, leftX + colW[0] / 2, topY + headerH + bodyH / 2, { align:'center' });
+      if (evalText) doc.text(evalText, leftX + colW[0] + colW[1] / 2, topY + headerH + bodyH / 2, { align:'center' });
 
-    state.y = topY + totalH + 14;
+      doc.setFont('times', 'italic');
+      drawJustifiedPdfParagraph(
+        chunkLines,
+        leftX + colW[0] + colW[1] + pad,
+        topY + headerH + 8,
+        colW[2] - pad * 2,
+        6,
+        true,
+        8
+      );
+
+      state.y = topY + totalH + 14;
+      firstChunk = false;
+    }
     return state;
   }
 
