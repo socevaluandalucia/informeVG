@@ -3047,13 +3047,19 @@ async function generateCoverPdf() {
 
   function addParagraph(state, text, opts={}) {
     if (!opts.skipEnsure) state = ensureSpace(state, 16);
-    doc.setFont('times', opts.italic ? 'italic' : (opts.bold ? 'bold' : 'normal'));
-    doc.setFontSize(opts.fontSize || 11.5);
-    doc.setTextColor(...(opts.color || [40,40,40]));
+    const fontStyle = opts.italic ? 'italic' : (opts.bold ? 'bold' : 'normal');
+    const fontSize = opts.fontSize || 11.5;
+    const textColor = opts.color || [40,40,40];
+    doc.setFont('times', fontStyle);
+    doc.setFontSize(fontSize);
+    doc.setTextColor(...textColor);
     const maxWidth = pageW - margin * 2;
     const lineHeight = opts.lineHeight || 5.8;
     const lines = doc.splitTextToSize(String(text || ''), maxWidth);
     state = ensureSpace(state, lines.length * lineHeight + (opts.after || 6));
+    doc.setFont('times', fontStyle);
+    doc.setFontSize(fontSize);
+    doc.setTextColor(...textColor);
     drawJustifiedPdfParagraph(lines, margin, state.y, maxWidth, lineHeight, false);
     state.y += lines.length * lineHeight + (opts.after || 6);
     return state;
@@ -3073,6 +3079,22 @@ async function generateCoverPdf() {
       state.y = nextY + 3.5;
     });
     return state;
+  }
+
+  function estimateSectionFirstContentHeight(items, emptyText) {
+    if (!items.length) {
+      doc.setFont('times', 'italic');
+      doc.setFontSize(11.5);
+      const lines = doc.splitTextToSize(String(emptyText || ''), pageW - margin * 2);
+      return lines.length * 5.8 + 16;
+    }
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(11.5);
+    const bulletGap = 5;
+    const textWidth = pageW - margin * 2 - bulletGap;
+    const lines = doc.splitTextToSize(String(items[0] || ''), textWidth);
+    return Math.max(14, lines.length * 5.6 + 3.5);
   }
 
   function addEvaluationMatrix(state, item, opts={}) {
@@ -3212,7 +3234,8 @@ async function generateCoverPdf() {
       });
     }
 
-    state = ensureSpace(state, 24);
+    const emptyAreasText = 'No se han descrito áreas de mejora en este criterio.';
+    state = ensureSpace(state, 10 + estimateSectionFirstContentHeight(allAreas, emptyAreasText));
     doc.setFont('times', 'bold');
     doc.setFontSize(17);
     doc.setTextColor(...state.color);
@@ -3220,13 +3243,14 @@ async function generateCoverPdf() {
     state.y += 10;
 
     if (!allAreas.length) {
-      state = addParagraph(state, 'No se han descrito áreas de mejora en este criterio.', { italic: true, after: 16 });
+      state = addParagraph(state, emptyAreasText, { italic: true, after: 16 });
     } else {
       state = addBulletList(state, allAreas);
       state.y += 8;
     }
 
-    state = ensureSpace(state, 24);
+    const emptyStrengthsText = 'No se han descrito fortalezas en este criterio.';
+    state = ensureSpace(state, 10 + estimateSectionFirstContentHeight(allStrengths, emptyStrengthsText));
     doc.setFont('times', 'bold');
     doc.setFontSize(17);
     doc.setTextColor(...state.color);
@@ -3234,7 +3258,7 @@ async function generateCoverPdf() {
     state.y += 10;
 
     if (!allStrengths.length) {
-      state = addParagraph(state, 'No se han descrito fortalezas en este criterio.', { italic: true, after: 16 });
+      state = addParagraph(state, emptyStrengthsText, { italic: true, after: 16 });
     } else {
       state = addBulletList(state, allStrengths);
     }
