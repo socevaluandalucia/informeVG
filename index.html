@@ -1304,7 +1304,6 @@ document.getElementById('fileInput').addEventListener('change', async (ev) => {
     enableFilters(false);
     enableGeneratePdf(false);
     enableSaveVersion(false);
-    enableGeneratePdf(false);
     currentData = null;
     document.getElementById('reportTitle').innerHTML = renderEditableHeader('', '');
     document.getElementById('reportTitle').querySelector('.report-main-title').textContent = 'Archivo .doc detectado';
@@ -1342,7 +1341,6 @@ document.getElementById('fileInput').addEventListener('change', async (ev) => {
     enableFilters(true);
     enableGeneratePdf(true);
     enableSaveVersion(true);
-    enableGeneratePdf(true);
     const defaultFilter = document.getElementById('filterTodos');
     if (defaultFilter) defaultFilter.checked = true;
     renderAll();
@@ -1422,7 +1420,6 @@ document.getElementById('generatePdfBtn').addEventListener('click', async () => 
     alert('No se pudo generar el PDF: ' + (err.message || err));
   }
 });
-
 
 document.addEventListener('click', (ev) => {
   const head = ev.target.closest('.criterion-head');
@@ -3067,14 +3064,19 @@ async function generateCoverPdf() {
 
   function addBulletList(state, items) {
     items.forEach(item => {
+      const fontSize = 11.5;
+      const textColor = [40, 40, 40];
       doc.setFont('times', 'normal');
-      doc.setFontSize(11.5);
-      doc.setTextColor(40, 40, 40);
+      doc.setFontSize(fontSize);
+      doc.setTextColor(...textColor);
       const itemText = String(item || '').trim();
       const bulletGap = 5;
       const textWidth = pageW - margin * 2 - bulletGap;
       const lines = doc.splitTextToSize(itemText, textWidth);
       state = ensureSpace(state, Math.max(14, lines.length * 5.6 + 3.5));
+      doc.setFont('times', 'normal');
+      doc.setFontSize(fontSize);
+      doc.setTextColor(...textColor);
       const nextY = drawBulletItem(itemText, margin, state.y, pageW - margin * 2, 5.6);
       state.y = nextY + 3.5;
     });
@@ -3409,9 +3411,6 @@ async function generateCoverPdf() {
     .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   doc.save(`informe_${safeName || 'ccvg'}.pdf`);
 }
-
-
-
 
 function applyCurrentFilter() {
   if (!currentData) return;
