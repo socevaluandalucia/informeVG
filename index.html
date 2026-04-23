@@ -1395,6 +1395,7 @@ document.getElementById('generatePdfBtn').addEventListener('click', async () => 
   const requiredCertificationResponsible = String(document.getElementById('certificationResponsibleInput')?.value || currentData?.certificationResponsible || '').trim();
   const requiredSelfEvalStartDate = String(document.getElementById('selfEvalStartDateInput')?.value || currentData?.selfEvalStartDate || '').trim();
   const requiredExternalEvalDate = String(document.getElementById('externalEvalDateInput')?.value || currentData?.externalEvalDate || '').trim();
+  const highlightCriterionRequired = canUseHighlightedCriterion(currentData);
   const requiredHighlightedCriterion = String(document.getElementById('highlightCriterionSelect')?.value || currentData?.highlightedCriterionCode || '').trim();
 
   const missing = [];
@@ -1405,7 +1406,7 @@ document.getElementById('generatePdfBtn').addEventListener('click', async () => 
   if (!requiredCertificationResponsible) missing.push({ label:'Responsable del centro para el seguimiento de la certificación', selector:'#certificationResponsibleInput' });
   if (!requiredSelfEvalStartDate) missing.push({ label:'Fecha de inicio de autoevaluación', selector:'#selfEvalStartDateInput' });
   if (!requiredExternalEvalDate) missing.push({ label:'Fecha de evaluación externa', selector:'#externalEvalDateInput' });
-  if (!requiredHighlightedCriterion) missing.push({ label:'Criterio destacado', selector:'#highlightCriterionSelect' });
+  if (highlightCriterionRequired && !requiredHighlightedCriterion) missing.push({ label:'Criterio destacado', selector:'#highlightCriterionSelect' });
 
   if (missing.length) {
     markMissingFields(missing);
@@ -3267,6 +3268,7 @@ async function generateCoverPdf() {
   });
 
   function addHighlightedCriterionPage() {
+    if (!canUseHighlightedCriterion(currentData)) return;
     const selectedCriterionCode = String(currentData?.highlightedCriterionCode || '').trim();
     if (!selectedCriterionCode) return;
 
@@ -3501,12 +3503,23 @@ function chooseAutomaticHighlightedCriterion(criteria=[]) {
 
 function ensureHighlightedCriterion(data, forceAuto=false) {
   if (!data) return '';
+  if (!canUseHighlightedCriterion(data)) {
+    data.highlightedCriterionCode = '';
+    data.highlightedCriterionManual = false;
+    return '';
+  }
   const autoCode = chooseAutomaticHighlightedCriterion(data.criteria || []);
   if (forceAuto || !data.highlightedCriterionManual || !data.highlightedCriterionCode) {
     data.highlightedCriterionCode = autoCode;
     data.highlightedCriterionManual = false;
   }
   return autoCode;
+}
+
+function canUseHighlightedCriterion(data) {
+  if (!data) return false;
+  const stats = computeSummaryStats(data);
+  return stats.noCumplenEsenciales === 0;
 }
 
 function getCriterionHighlightDetails(data, code) {
@@ -3527,6 +3540,17 @@ function getCriterionHighlightDetails(data, code) {
 }
 
 function renderHighlightedCriterionSelector(data, autoCode) {
+  if (!canUseHighlightedCriterion(data)) {
+    return `
+      <div id="highlightCriterionPanel" class="highlight-criterion-panel">
+        <div class="highlight-criterion-row">
+          <label>Criterio destacado</label>
+        </div>
+        <div class="highlight-criterion-help">Como existen estándares obligatorios no cumplidos, no se selecciona un criterio destacado.</div>
+      </div>
+    `;
+  }
+
   const selected = String(data?.highlightedCriterionCode || autoCode || '').trim();
   const autoCriterion = (data?.criteria || []).find(c => String(c.code || '').trim() === String(autoCode));
   const selectedIsAuto = selected && selected === String(autoCode || '') && !data?.highlightedCriterionManual;
@@ -3569,6 +3593,8 @@ function renderHighlightedCriterionControl(data) {
   const autoHighlightedCriterion = ensureHighlightedCriterion(data);
   box.style.display = 'block';
   box.innerHTML = renderHighlightedCriterionSelector(data, autoHighlightedCriterion);
+
+  if (!canUseHighlightedCriterion(data)) return;
 
   const highlightSelect = document.getElementById('highlightCriterionSelect');
   if (highlightSelect) {
