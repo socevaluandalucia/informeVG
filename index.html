@@ -2569,11 +2569,11 @@ async function generateCoverPdf() {
 
   // Portada
   if (logoPortada) {
-    const fit = fitBox(logoPortada.width, logoPortada.height, 85, 85);
-    doc.addImage(logoPortada.dataUrl, 'PNG', (pageW - fit.w)/2, 50, fit.w, fit.h);
+    const fit = fitBox(logoPortada.width, logoPortada.height, 62, 62);
+    doc.addImage(logoPortada.dataUrl, 'PNG', (pageW - fit.w)/2, 42, fit.w, fit.h);
   }
 
-  const textStartY = 135;
+  const textStartY = 145;
   const lineGap = 14;
 
   doc.setFont('helvetica','normal');
