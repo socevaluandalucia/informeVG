@@ -1075,7 +1075,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-subtitle">Centros comprometidos contra la violencia de género <span style="font-size:12px;color:#888;margin-left:8px;">v1.02</span></div>
+      <div class="app-header-subtitle">Centros comprometidos contra la violencia de género <span style="font-size:12px;color:#888;margin-left:8px;">v1.03</span></div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
       <div id="userNameDisplay" style="font-size:12px;color:#666;text-align:right;min-height:16px;width:100%;"></div>
@@ -2173,7 +2173,7 @@ function renderStructuredTitle(rawTitle='') {
                     <option value="Dña. Mª del Mar Sánchez Gila" ${leadEvaluator === 'Dña. Mª del Mar Sánchez Gila' ? 'selected' : ''}>Dña. Mª del Mar Sánchez Gila</option>
                     <option value="Dña. Mª Teresa Medina Duque" ${leadEvaluator === 'Dña. Mª Teresa Medina Duque' ? 'selected' : ''}>Dña. Mª Teresa Medina Duque</option>
                     <option value="Dña. María José Castro Ruiz" ${leadEvaluator === 'Dña. María José Castro Ruiz' ? 'selected' : ''}>Dña. María José Castro Ruiz</option>
-                    <option value="D. Miiguel Prieto Domínguez" ${leadEvaluator === 'D. Miiguel Prieto Domínguez' ? 'selected' : ''}>D. Miiguel Prieto Domínguez</option>
+                    <option value="D. Miguel Prieto Domínguez" ${leadEvaluator === 'D. Miguel Prieto Domínguez' ? 'selected' : ''}>D. Miguel Prieto Domínguez</option>
                     <option value="Dña. Olga Orozco Roldán" ${leadEvaluator === 'Dña. Olga Orozco Roldán' ? 'selected' : ''}>Dña. Olga Orozco Roldán</option>
                     <option value="D. Rafael Romero de Castilla Gil" ${leadEvaluator === 'D. Rafael Romero de Castilla Gil' ? 'selected' : ''}>D. Rafael Romero de Castilla Gil</option>
                     <option value="D. Raúl Pérez González" ${leadEvaluator === 'D. Raúl Pérez González' ? 'selected' : ''}>D. Raúl Pérez González</option>
@@ -2193,7 +2193,7 @@ function renderStructuredTitle(rawTitle='') {
                     <option value="Dña. Mª del Mar Sánchez Gila" ${evaluator === 'Dña. Mª del Mar Sánchez Gila' ? 'selected' : ''}>Dña. Mª del Mar Sánchez Gila</option>
                     <option value="Dña. Mª Teresa Medina Duque" ${evaluator === 'Dña. Mª Teresa Medina Duque' ? 'selected' : ''}>Dña. Mª Teresa Medina Duque</option>
                     <option value="Dña. María José Castro Ruiz" ${evaluator === 'Dña. María José Castro Ruiz' ? 'selected' : ''}>Dña. María José Castro Ruiz</option>
-                    <option value="D. Miiguel Prieto Domínguez" ${evaluator === 'D. Miiguel Prieto Domínguez' ? 'selected' : ''}>D. Miiguel Prieto Domínguez</option>
+                    <option value="D. Miguel Prieto Domínguez" ${evaluator === 'D. Miguel Prieto Domínguez' ? 'selected' : ''}>D. Miguel Prieto Domínguez</option>
                     <option value="Dña. Olga Orozco Roldán" ${evaluator === 'Dña. Olga Orozco Roldán' ? 'selected' : ''}>Dña. Olga Orozco Roldán</option>
                     <option value="D. Rafael Romero de Castilla Gil" ${evaluator === 'D. Rafael Romero de Castilla Gil' ? 'selected' : ''}>D. Rafael Romero de Castilla Gil</option>
                     <option value="D. Raúl Pérez González" ${evaluator === 'D. Raúl Pérez González' ? 'selected' : ''}>D. Raúl Pérez González</option>
@@ -3476,7 +3476,8 @@ function countCriterionEditableItems(criterion) {
 }
 
 function criterionStandardsAllPass(standardsList=[]) {
-  return standardsList.length > 0 && standardsList.every(s => !String(s.evaluation || '').toLowerCase().includes('no cumple'));
+  const essentials = standardsList.filter(s => String(s.essentiality || '').toLowerCase().includes('esencial'));
+  return essentials.length > 0 && essentials.every(s => !String(s.evaluation || '').toLowerCase().includes('no cumple'));
 }
 
 function chooseAutomaticHighlightedCriterion(criteria=[]) {
