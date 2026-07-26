@@ -1038,6 +1038,52 @@
       color:#111827;
     }
 
+
+    /* ---- Pestañas de fase ---- */
+    .phase-tabs-bar{display:flex;gap:0;margin-bottom:0;border-bottom:2px solid #ddd;margin-top:14px}
+    .phase-tab-btn{padding:9px 22px;border:none;background:#f5f5f5;cursor:pointer;font-size:14px;font-weight:600;border-radius:6px 6px 0 0;margin-right:4px;color:#555;border:1px solid #ddd;border-bottom:none;transition:background .15s,color .15s}
+    .phase-tab-btn.eval-tab.active{background:#1565c0;color:#fff;border-color:#1565c0}
+    .phase-tab-btn.estab-tab.active{background:#2e7d32;color:#fff;border-color:#2e7d32}
+    .phase-tab-btn:not(.active):hover{background:#e8e8e8}
+    .phase-tab-panel{display:none}
+    .phase-tab-panel.active{display:block}
+    /* Fase bloqueada */
+    .phase-locked-banner{background:#c62828;color:#fff;padding:8px 14px;border-radius:5px;font-size:13px;font-weight:600;margin-bottom:12px}
+    .phase-locked input,.phase-locked select,.phase-locked textarea{pointer-events:none;opacity:.55}
+    .phase-locked .btn-generate{opacity:.4;cursor:not-allowed;pointer-events:none}
+    /* Estabilización */
+    .estab-header{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:7px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#1b5e20}
+    .estab-section{background:#fff;border:1px solid #c8e6c9;border-radius:7px;padding:14px 16px;margin-bottom:14px}
+    .estab-ref-box{background:#f9fbe7;border:1px solid #dce775;border-radius:5px;padding:8px 12px;margin-bottom:8px;font-size:13px;color:#555}
+    .estab-ref-title{font-weight:700;color:#827717;font-size:12px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em}
+    .estab-eval-buttons{display:flex;gap:6px;margin:6px 0}
+    .estab-eval-btn{padding:5px 14px;border-radius:20px;border:2px solid #ccc;background:#f5f5f5;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s}
+    .estab-eval-btn.active-cumple{background:#2e7d32;color:#fff;border-color:#2e7d32}
+    .estab-eval-btn.active-nocumple{background:#c62828;color:#fff;border-color:#c62828}
+    .estab-eval-btn.active-noaplica{background:#757575;color:#fff;border-color:#757575}
+    textarea.estab-text{color:#2e7d32;font-size:13px;font-family:inherit;box-sizing:border-box;resize:vertical;min-height:36px;width:100%}
+    .estab-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:6px}
+    .estab-badge.esencial{background:#1976d2;color:#fff}
+    .estab-badge.no-esencial{background:#78909c;color:#fff}
+    .estab-start-btn{background:#2e7d32;color:#fff;border:none;border-radius:6px;padding:9px 20px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px}
+    .estab-start-btn:hover{background:#1b5e20}
+    .estab-start-btn:disabled{background:#aaa;cursor:not-allowed}
+    .btn-generate-estab{background:#2e7d32;color:#fff;border:none;border-radius:6px;padding:9px 20px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px}
+    .btn-generate-estab:hover{background:#1b5e20}
+    .btn-generate-estab:disabled{background:#aaa;cursor:not-allowed}
+    .estab-criterion-section{border:1px solid #c8e6c9;border-radius:7px;margin-bottom:12px;overflow:hidden}
+    .estab-criterion-head{background:#e8f5e9;padding:10px 14px;font-weight:700;color:#1b5e20;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none}
+    .estab-criterion-body{padding:12px 14px}
+    .estab-standard-card{border:1px solid #c8e6c9;border-radius:6px;padding:12px;margin-bottom:10px;background:#fafffe}
+    /* Modal confirmación */
+    .custom-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center}
+    .custom-modal-card{background:#fff;border-radius:10px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden}
+    .custom-modal-header{background:#2e7d32;color:#fff;padding:14px 20px;font-size:16px;font-weight:700}
+    .custom-modal-body{padding:20px;font-size:14px;line-height:1.6;color:#333}
+    .custom-modal-footer{padding:12px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #eee}
+    .custom-modal-footer button{padding:8px 20px;border-radius:6px;border:none;cursor:pointer;font-size:14px;font-weight:600}
+    .custom-modal-cancel{background:#eee;color:#333}
+    .custom-modal-confirm{background:#2e7d32;color:#fff}
 </style>
 </head>
 <body class="locked">
@@ -1075,7 +1121,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-subtitle">Centros comprometidos contra la violencia de género <span style="font-size:12px;color:#888;margin-left:8px;">v1.04</span></div>
+      <div class="app-header-subtitle">Centros comprometidos contra la violencia de género <span style="font-size:12px;color:#888;margin-left:8px;">v1.14</span></div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
       <div id="userNameDisplay" style="font-size:12px;color:#666;text-align:right;min-height:16px;width:100%;"></div>
@@ -1097,8 +1143,18 @@
           <label class="btn" style="text-align:center; line-height:1.2;" for="fileInput"><span>Importar</span><br><span>archivo WORD</span></label>
           <input id="fileInput" type="file" accept=".doc,.docx" hidden />
           <span class="file-name" id="fileName">Sin archivo cargado</span>
+          <details style="font-size:13px;color:#555;margin-top:4px;">
+            <summary style="cursor:pointer;color:#1976d2;font-size:12px;">¿Problemas con un .doc?</summary>
+            <div style="margin-top:6px;padding:8px;background:#f5f5f5;border-radius:6px;font-size:12px;line-height:1.5;">
+              <p style="margin:0 0 6px 0;">Si el archivo .doc no se importa correctamente, conviértelo con LibreOffice:</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" onclick="downloadDocConvertScript('windows')" style="font-size:11px;padding:4px 10px;cursor:pointer;">⬇ Script Windows (.bat)</button>
+                <button type="button" onclick="downloadDocConvertScript('mac')" style="font-size:11px;padding:4px 10px;cursor:pointer;">⬇ Script Mac / Linux (.sh)</button>
+              </div>
+            </div>
+          </details>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;justify-content:flex-end;"><button id="historyBtn" class="btn-history" type="button">Historial de informes</button><button id="loadVersionBtn" class="btn-load-version" type="button">Importar proyecto</button><button id="saveVersionBtn" class="btn-save-version" type="button" disabled>Guardar proyecto</button><button id="generatePdfBtn" class="btn-generate" type="button" disabled style="margin-left:auto;">Generar informe PDF</button><input id="loadVersionInput" type="file" accept=".json" hidden></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;justify-content:flex-end;"><button id="historyBtn" class="btn-history" type="button">Historial de informes</button><button id="loadVersionBtn" class="btn-load-version" type="button">Importar proyecto</button><button id="saveVersionBtn" class="btn-save-version" type="button" disabled>Guardar proyecto</button><input id="loadVersionInput" type="file" accept=".json" hidden></div>
       </div>
 
       <div class="radio-group">
@@ -1133,14 +1189,44 @@
       <div id="versionsList" class="versions-list"></div>
     </div>
 
-    <div id="outcomeStatus" class="outcome-status" style="display:none"></div>
+    <!-- Barra de pestañas de fase -->
+    <div class="phase-tabs-bar" id="phaseTabsBar" style="display:none">
+      <button type="button" id="phaseTabBtnEvaluacion" class="phase-tab-btn eval-tab active" onclick="switchPhaseTab('evaluacion')">Fase de evaluación</button>
+      <button type="button" id="phaseTabBtnEstabilizacion" class="phase-tab-btn estab-tab" onclick="switchPhaseTab('estabilizacion')">Fase de estabilización</button>
+    </div>
 
-    <div id="summary" class="summary" style="display:none"></div>
-    <div id="highlightCriterionContainer" style="display:none"></div>
+    <!-- Panel: Fase de evaluación -->
+    <div id="phaseTabEvaluacion" class="phase-tab-panel active">
+      <!-- Barra de acciones fase evaluación -->
+      <div id="evalActionBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0 6px 0;border-bottom:1px solid #e0e0e0;margin-bottom:10px;">
+        <button id="startEstabilizacionBtn" class="estab-start-btn" type="button" disabled onclick="startEstabilizacionPhase()" style="margin-top:0;">Comenzar estabilización</button>
+        <button id="estabilizacionActivoBtn" class="estab-start-btn" type="button" style="display:none;opacity:.6;cursor:not-allowed;margin-top:0;" disabled>Estabilización en curso</button>
+        <button id="generatePdfBtn" class="btn-generate" type="button" disabled style="margin-left:auto;background:#1565c0;border-color:#1565c0;margin-top:0;">Generar Informe de Evaluación</button>
+      </div>
+      <div id="outcomeStatus" class="outcome-status" style="display:none"></div>
+      <div id="summary" class="summary" style="display:none"></div>
+      <div id="highlightCriterionContainer" style="display:none"></div>
+      <div id="report" class="panel placeholder">
+        <strong>Sin datos</strong><br>
+        Selecciona un archivo DOCX para comenzar.
+      </div>
+    </div>
 
-    <div id="report" class="panel placeholder">
-      <strong>Sin datos</strong><br>
-      Selecciona un archivo DOCX para comenzar.
+    <!-- Panel: Fase de estabilización -->
+    <div id="phaseTabEstabilizacion" class="phase-tab-panel">
+      <div id="estabilizacionContainer"></div>
+    </div>
+  </div>
+
+  <!-- Modal de confirmación propio -->
+  <div id="customModalOverlay" class="custom-modal-overlay" style="display:none">
+    <div class="custom-modal-card">
+      <div class="custom-modal-header">Evaland.es</div>
+      <div class="custom-modal-body" id="customModalBody"></div>
+      <div class="custom-modal-footer">
+        <button type="button" class="custom-modal-cancel" id="customModalCancelBtn">Cancelar</button>
+        <button type="button" class="custom-modal-confirm" id="customModalOkBtn">Continuar</button>
+      </div>
     </div>
   </div>
 
@@ -1406,7 +1492,7 @@ document.getElementById('generatePdfBtn').addEventListener('click', async () => 
   if (!requiredCertificationResponsible) missing.push({ label:'Responsable del centro para el seguimiento de la certificación', selector:'#certificationResponsibleInput' });
   if (!requiredSelfEvalStartDate) missing.push({ label:'Fecha de inicio de autoevaluación', selector:'#selfEvalStartDateInput' });
   if (!requiredExternalEvalDate) missing.push({ label:'Fecha de evaluación externa', selector:'#externalEvalDateInput' });
-  if (highlightCriterionRequired && !requiredHighlightedCriterion) missing.push({ label:'Criterio destacado', selector:'#highlightCriterionSelect' });
+  if (highlightCriterionRequired && !requiredHighlightedCriterion && !currentData?.highlightedCriterionManual) missing.push({ label:'Criterio destacado', selector:'#highlightCriterionSelect' });
 
   if (missing.length) {
     markMissingFields(missing);
@@ -1444,7 +1530,11 @@ function enableFilters(enabled){
 }
 function enableGeneratePdf(enabled){
   const btn = document.getElementById('generatePdfBtn');
-  if (btn) btn.disabled = !enabled;
+  if (btn) {
+    const locked = currentData && currentData.estabilizacionActive;
+    btn.disabled = !enabled || locked;
+    btn.style.opacity = (!enabled || locked) ? '0.4' : '';
+  }
 }
 function enableSaveVersion(enabled){
   const btn = document.getElementById('saveVersionBtn');
@@ -1697,6 +1787,11 @@ function buildCurrentVersionPayload() {
     evaluationOutcomeManual: !!currentData?.evaluationOutcomeManual,
     highlightedCriterionCode: String(currentData?.highlightedCriterionCode || '').trim(),
     highlightedCriterionManual: !!currentData?.highlightedCriterionManual,
+    estabilizacionActive: !!currentData?.estabilizacionActive,
+    estabilizacionStartedAt: String(currentData?.estabilizacionStartedAt || ''),
+    estabilizacionCriteria: Array.isArray(currentData?.estabilizacionCriteria) ? currentData.estabilizacionCriteria : [],
+    estabilizacionHighlightedCriterionCode: String(currentData?.estabilizacionHighlightedCriterionCode || '').trim(),
+    estabilizacionHighlightedCriterionManual: !!currentData?.estabilizacionHighlightedCriterionManual,
     criteria: Array.isArray(currentData?.criteria) ? currentData.criteria : [],
     meta: currentData?.meta || {}
   };
@@ -1722,6 +1817,11 @@ function applyVersionPayload(payload) {
   currentData.evaluationOutcomeManual = !!payload.evaluationOutcomeManual;
   currentData.highlightedCriterionCode = String(payload.highlightedCriterionCode || '').trim();
   currentData.highlightedCriterionManual = !!payload.highlightedCriterionManual;
+  currentData.estabilizacionActive = !!payload.estabilizacionActive;
+  currentData.estabilizacionStartedAt = String(payload.estabilizacionStartedAt || '');
+  currentData.estabilizacionCriteria = Array.isArray(payload.estabilizacionCriteria) ? payload.estabilizacionCriteria : [];
+  currentData.estabilizacionHighlightedCriterionCode = String(payload.estabilizacionHighlightedCriterionCode || '').trim();
+  currentData.estabilizacionHighlightedCriterionManual = !!payload.estabilizacionHighlightedCriterionManual;
   currentData.criteria = Array.isArray(payload.criteria) ? payload.criteria : [];
   currentData.meta.fileName = payload.sourceFileName || currentData.meta.fileName || '';
 
@@ -2443,20 +2543,33 @@ function formatSignatureDateSpanish(date=new Date()) {
 
 
 function toTitleCaseSpanish(text='') {
+  const knownAcronyms = ['FAISEM'];
   const lower = String(text || '').toLocaleLowerCase('es-ES').trim();
   const smallWords = new Set(['de','del','la','las','el','los','y','e','a','en','por','para','con','sin','o','u']);
   return lower
     .split(/(\s+)/)
     .map((token, index) => {
       if (/^\s+$/.test(token)) return token;
+      if (/^\(.*\)$/.test(token)) return token.toLocaleUpperCase('es-ES');
       const normalized = token.replace(/[.,;:()]/g, '');
+      if (knownAcronyms.some(a => a.toLowerCase() === normalized.toLowerCase())) return normalized.toLocaleUpperCase('es-ES');
       if (index > 0 && smallWords.has(normalized)) return token;
       return token.replace(/(^|[\-\/(])([a-záéíóúüñ])/g, (match, sep, ch) => sep + ch.toLocaleUpperCase('es-ES'));
     })
     .join('');
 }
 
-async function generateCoverPdf() {
+function isEssentialStandard(s) {
+  const t = String(s.essentiality || '').toLowerCase().trim();
+  return t.includes('esencial') && !t.startsWith('no ');
+}
+
+function centroPhrase(articulo, nombre) {
+  if (/^centro/i.test(String(nombre || '').trim())) return `${articulo} ${nombre}`;
+  return `${articulo} centro ${nombre}`;
+}
+
+async function generateCoverPdf(mode='evaluacion', pdfContext={}) {
   if (!currentData) return;
   syncEvaluationOutcomeFromSelect();
   const { jsPDF } = window.jspdf;
@@ -2575,13 +2688,20 @@ async function generateCoverPdf() {
     doc.addImage(logoPortada.dataUrl, 'PNG', (pageW - fit.w)/2, 42, fit.w, fit.h);
   }
 
-  const textStartY = 145;
+  let textStartY = 145;
   const lineGap = 14;
 
   doc.setFont('helvetica','normal');
   doc.setFontSize(16);
   doc.setTextColor(0,0,0);
   doc.text('INFORME DE EVALUACIÓN DEL PROYECTO', pageW/2, textStartY, {align:'center'});
+  if (mode === 'estabilizacion') {
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(16);
+    doc.setTextColor(0,0,0);
+    doc.text('TRAS SITUACIÓN DE PENDIENTE DE ESTÁNDARES', pageW/2, textStartY + lineGap, {align:'center'});
+    textStartY += lineGap;
+  }
 
   if (pdfCode) {
     doc.setFont('helvetica','bold');
@@ -2592,7 +2712,7 @@ async function generateCoverPdf() {
 
   if (pdfCenter) {
     doc.setFont('helvetica','bold');
-    doc.setFontSize(11);
+    doc.setFontSize(16);
     doc.setTextColor(118,65,162);
     doc.text(pdfCenter, pageW/2, textStartY + (lineGap * 2), {align:'center'});
   }
@@ -2666,7 +2786,7 @@ async function generateCoverPdf() {
   doc.setTextColor(40, 40, 40);
   doc.setFontSize(11.5);
   const pdfCenterTitle = toTitleCaseSpanish(pdfCenter);
-  const p1 = `El alcance de la evaluación corresponde al centro ${pdfCenterTitle}.`;
+  const p1 = `El alcance de la evaluación corresponde ${centroPhrase('al', pdfCenterTitle)}.`;
   const p1Lines = doc.splitTextToSize(p1, pageW - margin * 2);
   drawJustifiedPdfParagraph(p1Lines, margin, y3, pageW - margin * 2, 6.2, false);
   y3 += p1Lines.length * 6.2 + 14;
@@ -2683,13 +2803,25 @@ async function generateCoverPdf() {
   const fullExternalDate = formatFullDateSpanish(externalEvalDate);
 
   const paragraphs = [
-    `El centro ${pdfCenterTitle} inició la autoevaluación en ${startMonthYear}, según los estándares propuestos en el programa de certificación de “Centros Comprometidos contra la Violencia de Género” y tomando como referencia el “Manual de estándares Centros Comprometidos contra la Violencia de Género”.`,
+    `${centroPhrase('El', pdfCenterTitle)} inició la autoevaluación en ${startMonthYear}, según los estándares propuestos en el programa de certificación de “Centros Comprometidos contra la Violencia de Género” y tomando como referencia el “Manual de estándares Centros Comprometidos contra la Violencia de Género”.`,
     `Las personas responsables de la entidad relacionados con el proyecto son:`,
     `Dirección Gerencia:`,
     `${centerManagement}`,
     `Responsable del centro para el seguimiento de la certificación:`,
     `${certificationResponsible}`,
-    `Finalizada la autoevaluación, se realiza la visita de evaluación externa al centro el ${fullExternalDate}, según la agenda acordada con la Dirección de la entidad y disponible en su proyecto para su conocimiento.`,
+    ...((() => {
+      if (mode === 'estabilizacion') {
+        const fc = pdfContext.failedCodes || [];
+        const num = fc.length;
+        const singular = num === 1;
+        const listStr = num === 0 ? '' : num === 1 ? fc[0] : fc.slice(0,-1).join(', ') + ' y ' + fc[fc.length-1];
+        return [
+          `Finalizada la autoevaluación, se realiza la visita de evaluación externa al centro el ${fullExternalDate}. Al no cumplir ${singular ? 'el estándar esencial' : 'los estándares esenciales'} ${listStr} el centro queda en situación de pendiente de estándares.`,
+          'Desde la comunicación del resultado, el centro cuenta con un nuevo periodo de 60 días para dar respuesta a los estándares que no han superado la evaluación, obligatoriamente en los estándares esenciales y de forma opcional los estándares no esenciales no cumplidos.'
+        ];
+      }
+      return [`Finalizada la autoevaluación, se realiza la visita de evaluación externa al centro el ${fullExternalDate}, según la agenda acordada con la Dirección de la entidad y disponible en su proyecto para su conocimiento.`];
+    })()),
     `Los y las profesionales que conforman el equipo de evaluación tienen la cualificación para el desempeño de las actividades de evaluación según el Programa de Cualificación de Evaluadores de la Agencia de Calidad Sanitaria de Andalucía. No se ha declarado conflicto de intereses del equipo evaluador respecto a la entidad evaluada.`,
     `La Agencia de Calidad Sanitaria de Andalucía garantiza el mantenimiento de la confidencialidad de la información obtenida durante el proceso de certificación y no asume ninguna responsabilidad relativa a la difusión de esta información por parte de los destinatarios de la misma. Cualquier manipulación de este informe está estrictamente prohibida.`
   ];
@@ -3281,36 +3413,58 @@ async function generateCoverPdf() {
       .trim()
       .toUpperCase();
     const selectedCriterionColor = criterionColor(selectedCriterionCode);
-    const criterionLogo = bundledPngLogoData(`pdfLogoCriterion${selectedCriterionCode}`);
+    const criterionNumMatch = String(selectedCriterionCode).match(/(\d+)/);
+    const criterionNum = criterionNumMatch ? criterionNumMatch[1] : selectedCriterionCode;
+    const criterionLogo = bundledPngLogoData(`pdfLogoCriterion${criterionNum}`);
 
     reportPageNumber += 1;
     doc.addPage();
     drawReportHeaderFooter();
 
-    const text = `Por cumplirse todos los estándares esenciales y sumar el mayor número de fortalezas, el centro ${pdfCenterTitle} destaca en el criterio:`;
-    const textY = 62;
+    const text = `Por cumplirse todos los estándares esenciales y sumar el mayor número de fortalezas, ${centroPhrase('el', pdfCenterTitle)} destaca en el criterio:`;
 
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(9.5);
     doc.setTextColor(0, 0, 0);
     const textLines = doc.splitTextToSize(text, pageW - margin * 2);
-    doc.text(textLines, margin, textY);
 
+    // Centrar verticalmente el bloque (texto + logo + nombre)
+    const usableTop = pdfContentTop;
+    const usableBottom = pdfContentBottom;
+    const usableH = usableBottom - usableTop;
+
+    let blockH = textLines.length * 4.6;
+    let fitHighlighted = null;
     if (criterionLogo) {
-      const fitHighlighted = fitBox(criterionLogo.width, criterionLogo.height, 128, 100);
-      const logoX = (pageW - fitHighlighted.w) / 2;
-      const logoY = textY + textLines.length * 4.6 + 30;
-      doc.addImage(criterionLogo.dataUrl, 'PNG', logoX, logoY, fitHighlighted.w, fitHighlighted.h);
-
-      doc.setFont('times', 'bold');
-      doc.setFontSize(24);
-      doc.setTextColor(...selectedCriterionColor);
-      const highlightedTitleLines = doc.splitTextToSize(selectedCriterionName, 150);
-      doc.text(highlightedTitleLines, pageW / 2, logoY + fitHighlighted.h + 20, {
-        align: 'center',
-        baseline: 'top'
-      });
+      fitHighlighted = fitBox(criterionLogo.width, criterionLogo.height, 128, 100);
+      blockH += 10 + fitHighlighted.h;
     }
+    doc.setFont('times', 'bold');
+    doc.setFontSize(24);
+    const highlightedTitleLines = doc.splitTextToSize(selectedCriterionName, 150);
+    blockH += (criterionLogo ? 20 : 10) + highlightedTitleLines.length * 10;
+
+    const blockTop = usableTop + Math.max(0, (usableH - blockH) / 2);
+    let curY = blockTop;
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text(textLines, margin, curY);
+    curY += textLines.length * 4.6;
+
+    if (criterionLogo && fitHighlighted) {
+      curY += 10;
+      const logoX = (pageW - fitHighlighted.w) / 2;
+      doc.addImage(criterionLogo.dataUrl, 'PNG', logoX, curY, fitHighlighted.w, fitHighlighted.h);
+      curY += fitHighlighted.h;
+    }
+
+    curY += criterionLogo ? 20 : 10;
+    doc.setFont('times', 'bold');
+    doc.setFontSize(24);
+    doc.setTextColor(...selectedCriterionColor);
+    doc.text(highlightedTitleLines, pageW / 2, curY, { align: 'center', baseline: 'top' });
   }
 
   addHighlightedCriterionPage();
@@ -3352,7 +3506,9 @@ async function generateCoverPdf() {
     doc.text('4. Continuación del proceso', margin, state.y);
     state.y += 16;
 
-    if (isPendingStandards) {
+    if (isPendingStandards && mode === 'estabilizacion') {
+      state = addContinuationParagraph(state, 'Una vez recibido el informe de evaluación, la persona responsable del proceso de la entidad podrá presentar alegaciones por escrito a través de la zona de comunicación del proyecto en un plazo de 5 días hábiles.', { skipEnsure: true });
+    } else if (isPendingStandards) {
       state = addContinuationParagraph(state, 'El centro dispone de hasta un máximo de 90 días desde la comunicación del resultado para dar respuesta a los estándares que no han superado la evaluación, obligatoriamente en los estándares esenciales y de forma opcional los estándares no esenciales no cumplidos, debiendo alcanzar el mínimo establecido (24 estándares).', { skipEnsure: true });
       state = addBeltIaPendingParagraph(state);
       state = addContinuationParagraph(state, 'Del mismo modo, el centro deberá actualizar la información aportada en aquellos estándares esenciales y elementos orientativos imprescindibles que puedan comprometer el mantenimiento de la certificación.');
@@ -3413,7 +3569,8 @@ async function generateCoverPdf() {
     .toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  doc.save(`informe_${safeName || 'ccvg'}.pdf`);
+  const pdfModeStr = mode === 'estabilizacion' ? 'estabilizacion' : 'evaluacion';
+  doc.save(`informe_${pdfModeStr}_${safeName || 'ccvg'}.pdf`);
 }
 
 function applyCurrentFilter() {
@@ -3478,7 +3635,7 @@ function countCriterionEditableItems(criterion) {
 }
 
 function criterionStandardsAllPass(standardsList=[]) {
-  const essentials = standardsList.filter(s => String(s.essentiality || '').toLowerCase().includes('esencial'));
+  const essentials = standardsList.filter(s => isEssentialStandard(s));
   return essentials.length > 0 && essentials.every(s => !String(s.evaluation || '').toLowerCase().includes('no cumple'));
 }
 
@@ -3491,17 +3648,25 @@ function chooseAutomaticHighlightedCriterion(criteria=[]) {
       code: String(criterion.code || '').trim(),
       allPass: criterionStandardsAllPass(standardsList),
       fortalezas: counts.fortalezas,
+      areasMejora: counts.areasMejora,
       standardsPass,
       totalStandards: standardsList.length
     };
   }).filter(x => x.code);
 
-  const fullPass = ranked
-    .filter(x => x.allPass)
-    .sort((a, b) => (b.fortalezas - a.fortalezas) || (b.totalStandards - a.totalStandards) || String(a.code).localeCompare(String(b.code), 'es'));
+  const candidates = ranked.filter(x => x.allPass);
+  if (!candidates.length) return '';
 
-  if (fullPass.length) return fullPass[0].code;
-  return '';
+  // Primero: candidato con ≥2 fortalezas y más fortalezas
+  const withFortalezas = [...candidates]
+    .filter(x => x.fortalezas >= 2)
+    .sort((a, b) => (b.fortalezas - a.fortalezas) || (b.totalStandards - a.totalStandards) || String(a.code).localeCompare(String(b.code), 'es'));
+  if (withFortalezas.length) return withFortalezas[0].code;
+
+  // Reserva: ninguno llega a 2 fortalezas → el de menos áreas de mejora
+  const byAreas = [...candidates]
+    .sort((a, b) => (a.areasMejora - b.areasMejora) || (b.fortalezas - a.fortalezas) || (b.totalStandards - a.totalStandards) || String(a.code).localeCompare(String(b.code), 'es'));
+  return byAreas[0].code;
 }
 
 function ensureHighlightedCriterion(data, forceAuto=false) {
@@ -3512,7 +3677,7 @@ function ensureHighlightedCriterion(data, forceAuto=false) {
     return '';
   }
   const autoCode = chooseAutomaticHighlightedCriterion(data.criteria || []);
-  if (forceAuto || !data.highlightedCriterionManual || !data.highlightedCriterionCode) {
+  if (forceAuto || !data.highlightedCriterionManual) {
     data.highlightedCriterionCode = autoCode;
     data.highlightedCriterionManual = false;
   }
@@ -3554,7 +3719,7 @@ function renderHighlightedCriterionSelector(data, autoCode) {
     `;
   }
 
-  const selected = String(data?.highlightedCriterionCode || autoCode || '').trim();
+  const selected = data?.highlightedCriterionManual ? String(data?.highlightedCriterionCode || '').trim() : String(data?.highlightedCriterionCode || autoCode || '').trim();
   const autoCriterion = (data?.criteria || []).find(c => String(c.code || '').trim() === String(autoCode));
   const selectedIsAuto = selected && selected === String(autoCode || '') && !data?.highlightedCriterionManual;
   const selectedDetails = getCriterionHighlightDetails(data, selected);
@@ -3566,9 +3731,12 @@ function renderHighlightedCriterionSelector(data, autoCode) {
 
   const modeText = data?.highlightedCriterionManual ? 'Selección manual' : 'Selección automática';
   const manualClass = data?.highlightedCriterionManual ? ' manual' : '';
-  const detailText = selectedDetails
-    ? `El criterio seleccionado cumple <strong>${formatPercentValue(selectedDetails.passPercent)}</strong> de sus estándares (${selectedDetails.passCount}/${selectedDetails.totalStandards}) y suma <strong>${selectedDetails.fortalezas}</strong> fortalezas.`
-    : 'Selecciona un criterio para completar este campo obligatorio.';
+  const ningunoElegido = data?.highlightedCriterionManual && !selected;
+  const detailText = ningunoElegido
+    ? 'No se destacará ningún criterio en el informe.'
+    : selectedDetails
+      ? `El criterio seleccionado cumple <strong>${formatPercentValue(selectedDetails.passPercent)}</strong> de sus estándares (${selectedDetails.passCount}/${selectedDetails.totalStandards}) y suma <strong>${selectedDetails.fortalezas}</strong> fortalezas.`
+      : 'Selecciona un criterio para completar este campo obligatorio.';
   const selectionText = selectedIsAuto
     ? 'Puedes cambiarlo manualmente si el evaluador considera que otro criterio debe destacarse.'
     : autoCriterion
@@ -3580,7 +3748,7 @@ function renderHighlightedCriterionSelector(data, autoCode) {
       <div class="highlight-criterion-row">
         <label for="highlightCriterionSelect">Criterio destacado *</label>
         <select id="highlightCriterionSelect" class="highlight-criterion-select">
-          <option value=""></option>
+          <option value="">Ninguno</option>
           ${options}
         </select>
         <span class="highlight-criterion-mode${manualClass}">${modeText}</span>
@@ -3612,6 +3780,14 @@ function renderHighlightedCriterionControl(data) {
   }
 }
 
+function formatEssentialCodesList(failingEssentials) {
+  if (!failingEssentials.length) return '';
+  const label = failingEssentials.length === 1 ? 'Buena práctica' : 'Buenas prácticas';
+  const codes = failingEssentials.map(s => String(s.code || '').trim()).filter(Boolean);
+  const codesStr = codes.length <= 1 ? (codes[0] || '') : codes.slice(0, -1).join(', ') + ' y ' + codes[codes.length - 1];
+  return `(${label} ${codesStr})`;
+}
+
 function computeSummaryStats(data) {
   let totalStandards = 0, totalCumplen = 0, totalNoCumplen = 0;
   let totalEsenciales = 0, totalNoEsenciales = 0;
@@ -3621,8 +3797,8 @@ function computeSummaryStats(data) {
 
   const criteriaCards = (data.criteria || []).map(c => {
     const standardsList = c.standards || [];
-    const essentials = standardsList.filter(s => String(s.essentiality || '').toLowerCase().includes('esencial'));
-    const nonEssentials = standardsList.filter(s => !String(s.essentiality || '').toLowerCase().includes('esencial'));
+    const essentials = standardsList.filter(s => isEssentialStandard(s));
+    const nonEssentials = standardsList.filter(s => !isEssentialStandard(s));
 
     const esencialesCumplen = essentials.filter(s => !String(s.evaluation || '').toLowerCase().includes('no cumple')).length;
     const esencialesNoCumplen = essentials.filter(s => String(s.evaluation || '').toLowerCase().includes('no cumple')).length;
@@ -3726,10 +3902,14 @@ function renderOutcomeStatus(stats) {
   const messages = [];
   messages.push(`Se han cumplido <strong>${formatPercentValue(stats.percentCumplen)}</strong> de los estándares.`);
   if (stats.noCumplenEsenciales > 0) {
+    const failingEssentialsList = (currentData?.criteria || []).flatMap(c =>
+      (c.standards || []).filter(s => isEssentialStandard(s) && String(s.evaluation || '').toLowerCase().includes('no cumple'))
+    );
+    const codesStr = formatEssentialCodesList(failingEssentialsList);
     messages.push(
       stats.noCumplenEsenciales === 1
-        ? 'No se ha cumplido <strong>1 estándar esencial</strong>.'
-        : `No se han cumplido <strong>${stats.noCumplenEsenciales} estándares esenciales</strong>.`
+        ? `No se ha cumplido <strong>1 estándar esencial</strong> ${codesStr}.`.trim()
+        : `No se han cumplido <strong>${stats.noCumplenEsenciales} estándares esenciales</strong> ${codesStr}.`.trim()
     );
   }
 
@@ -3769,6 +3949,23 @@ function renderAll() {
   renderHighlightedCriterionControl(currentData);
   renderReport(currentData, filter);
   refreshEvaluationSelectColors(document.getElementById('report'));
+  // Barra de acciones y pestañas
+  const tabsBar = document.getElementById('phaseTabsBar');
+  if (tabsBar) tabsBar.style.display = '';
+  const actionBar = document.getElementById('evalActionBar');
+  if (actionBar) actionBar.style.display = 'flex';
+  // Estado del botón de inicio
+  const startBtn = document.getElementById('startEstabilizacionBtn');
+  const activoBtn = document.getElementById('estabilizacionActivoBtn');
+  if (currentData.estabilizacionActive) {
+    applyEvalLock(true);
+    renderEstabilizacionPanel();
+    if (startBtn) startBtn.style.display = 'none';
+    if (activoBtn) activoBtn.style.display = '';
+  } else {
+    if (startBtn) { startBtn.style.display = ''; startBtn.disabled = false; }
+    if (activoBtn) activoBtn.style.display = 'none';
+  }
 }
 
 function renderSummary(data) {
@@ -4135,6 +4332,608 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch (e) {}
 });
+
+
+// ===================================================================
+// FASE DE ESTABILIZACIÓN
+// ===================================================================
+
+// --- Modal de confirmación personalizado ---
+function customConfirm(message) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('customModalOverlay');
+    const body = document.getElementById('customModalBody');
+    const okBtn = document.getElementById('customModalOkBtn');
+    const cancelBtn = document.getElementById('customModalCancelBtn');
+    body.innerHTML = message;
+    overlay.style.display = 'flex';
+    const cleanup = (result) => {
+      overlay.style.display = 'none';
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    };
+    const onOk = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+// --- switchPhaseTab ---
+function switchPhaseTab(tab) {
+  const isEval = tab === 'evaluacion';
+  const evalPanel = document.getElementById('phaseTabEvaluacion');
+  const estabPanel = document.getElementById('phaseTabEstabilizacion');
+  const evalBtn = document.getElementById('phaseTabBtnEvaluacion');
+  const estabBtn = document.getElementById('phaseTabBtnEstabilizacion');
+  if (!evalPanel || !estabPanel) return;
+  evalPanel.classList.toggle('active', isEval);
+  estabPanel.classList.toggle('active', !isEval);
+  if (evalBtn) evalBtn.classList.toggle('active', isEval);
+  if (estabBtn) estabBtn.classList.toggle('active', !isEval);
+  if (!isEval) {
+    // Recalcular autosize al mostrar
+    setTimeout(() => {
+      const cont = document.getElementById('estabilizacionContainer');
+      if (cont) {
+        autosizeJustificationTextareas(cont);
+        autosizeEditableList(cont);
+      }
+    }, 50);
+  }
+}
+
+// --- Helpers de estabilización ---
+function stdEvalFails(standard) {
+  return (standard.evaluation || '').toLowerCase().includes('no cumple');
+}
+function stdFails(standard) {
+  if (stdEvalFails(standard)) return true;
+  return (standard.eos || []).some(eo => (eo.evaluation || '').toLowerCase().includes('no cumple'));
+}
+
+function buildEstabilizacionCriteria(criteria) {
+  let trackCounter = 0;
+  const result = [];
+  for (const criterion of criteria) {
+    const stds = (criterion.standards || []).filter(s => stdFails(s));
+    if (!stds.length) continue;
+    const estabStds = stds.map(s => {
+      trackCounter++;
+      const eos = (s.eos || []).map(eo => {
+        trackCounter++;
+        return {
+          trackId: `EST::EO${trackCounter}`,
+          code: eo.code, heading: eo.heading, description: eo.description,
+          essentiality: eo.essentiality, text: eo.text,
+          refEvaluation: eo.evaluation, refJustification: eo.justification,
+          refAreasMejora: [...(eo.areasMejora || [])], refFortalezas: [...(eo.fortalezas || [])],
+          autoevaluacion: eo.autoevaluacion, evaluation: eo.evaluation,
+          justification: eo.justification,
+          areasMejora: [...(eo.areasMejora || [])], fortalezas: [...(eo.fortalezas || [])]
+        };
+      });
+      return {
+        trackId: `EST::S${trackCounter}`,
+        code: s.code, heading: s.heading, description: s.description,
+        essentiality: s.essentiality,
+        refEvaluation: s.evaluation, refJustification: s.justification,
+        refAreasMejora: [...(s.areasMejora || [])], refFortalezas: [...(s.fortalezas || [])],
+        autoevaluacion: s.autoevaluacion, evaluation: s.evaluation,
+        justification: s.justification,
+        areasMejora: [...(s.areasMejora || [])], fortalezas: [...(s.fortalezas || [])],
+        eos
+      };
+    });
+    if (estabStds.length) {
+      result.push({ code: criterion.code, title: criterion.title, standards: estabStds });
+    }
+  }
+  return result;
+}
+
+// --- Fusión de criterios para PDF estabilización ---
+function fusionarCriteriosConEstabilizacion(originalCriteria, estabCriteria) {
+  const merged = JSON.parse(JSON.stringify(originalCriteria));
+  const byCode = {};
+  for (const ec of estabCriteria) {
+    for (const es of (ec.standards || [])) byCode[es.code] = es;
+    for (const es of (ec.standards || [])) {
+      for (const eo of (es.eos || [])) byCode[eo.code] = eo;
+    }
+  }
+  for (const crit of merged) {
+    for (const std of (crit.standards || [])) {
+      if (byCode[std.code]) {
+        const es = byCode[std.code];
+        std.evaluation = es.evaluation;
+        std.justification = es.justification;
+        std.autoevaluacion = es.autoevaluacion;
+        std.areasMejora = es.areasMejora;
+        std.fortalezas = es.fortalezas;
+      }
+      for (const eo of (std.eos || [])) {
+        if (byCode[eo.code]) {
+          const ee = byCode[eo.code];
+          eo.evaluation = ee.evaluation;
+          eo.justification = ee.justification;
+          eo.autoevaluacion = ee.autoevaluacion;
+          eo.areasMejora = ee.areasMejora;
+          eo.fortalezas = ee.fortalezas;
+        }
+      }
+    }
+  }
+  return merged;
+}
+
+// --- Resumen de estabilización (sobre datos fusionados) ---
+function computeEstabilizacionStats() {
+  if (!currentData || !currentData.estabilizacionActive) return null;
+  const merged = fusionarCriteriosConEstabilizacion(
+    currentData.criteria, currentData.estabilizacionCriteria || []
+  );
+  const tempData = Object.assign({}, currentData, { criteria: merged });
+  return computeSummaryStats(tempData);
+}
+
+// --- Criterio destacado de estabilización ---
+function canUseHighlightedCriterionEstabilizacion() {
+  const stats = computeEstabilizacionStats();
+  if (!stats) return false;
+  return stats.noCumplenEsenciales === 0;
+}
+
+function ensureEstabilizacionHighlightedCriterion(forceAuto = false) {
+  if (!currentData) return '';
+  if (!canUseHighlightedCriterionEstabilizacion()) {
+    currentData.estabilizacionHighlightedCriterionCode = '';
+    currentData.estabilizacionHighlightedCriterionManual = false;
+    return '';
+  }
+  const merged = fusionarCriteriosConEstabilizacion(
+    currentData.criteria, currentData.estabilizacionCriteria || []
+  );
+  const autoCode = chooseAutomaticHighlightedCriterion(merged);
+  if (forceAuto || !currentData.estabilizacionHighlightedCriterionManual) {
+    currentData.estabilizacionHighlightedCriterionCode = autoCode;
+    currentData.estabilizacionHighlightedCriterionManual = false;
+  }
+  return autoCode;
+}
+
+// --- Actualizar datos estabilización desde DOM ---
+function syncEstabilizacionFromDOM() {
+  if (!currentData || !currentData.estabilizacionCriteria) return;
+  for (const crit of currentData.estabilizacionCriteria) {
+    for (const std of (crit.standards || [])) {
+      const evalInput = document.querySelector(`[data-estab-eval="${std.trackId}"]`);
+      if (evalInput) std.evaluation = evalInput.value;
+      const justInput = document.querySelector(`[data-estab-just="${std.trackId}"]`);
+      if (justInput) std.justification = justInput.value;
+      const amListEl = document.querySelector(`[data-estab-am="${std.trackId}"]`);
+      if (amListEl) std.areasMejora = getEditableListValues(amListEl);
+      const fzListEl = document.querySelector(`[data-estab-fz="${std.trackId}"]`);
+      if (fzListEl) std.fortalezas = getEditableListValues(fzListEl);
+      for (const eo of (std.eos || [])) {
+        const eoEval = document.querySelector(`[data-estab-eval="${eo.trackId}"]`);
+        if (eoEval) eo.evaluation = eoEval.value;
+        const eoJust = document.querySelector(`[data-estab-just="${eo.trackId}"]`);
+        if (eoJust) eo.justification = eoJust.value;
+        const eoAm = document.querySelector(`[data-estab-am="${eo.trackId}"]`);
+        if (eoAm) eo.areasMejora = getEditableListValues(eoAm);
+        const eoFz = document.querySelector(`[data-estab-fz="${eo.trackId}"]`);
+        if (eoFz) eo.fortalezas = getEditableListValues(eoFz);
+      }
+    }
+  }
+}
+
+function getEditableListValues(root) {
+  const items = root.querySelectorAll('.editable-list-item textarea');
+  return [...items].map(t => t.value).filter(v => v.trim());
+}
+
+// --- Refresh del bloque superior de estabilización ---
+function refreshEstabilizacionTopSections() {
+  const box = document.getElementById('estabilizacionTopSections');
+  if (!box || !currentData || !currentData.estabilizacionActive) return;
+  box.innerHTML = renderEstabilizacionResumenBox() + renderEstabilizacionHighlightedCriterionBox();
+  // Reconectar evento de criterio destacado
+  const sel = document.getElementById('estabilizacionHighlightSelect');
+  if (sel) {
+    sel.addEventListener('change', () => {
+      currentData.estabilizacionHighlightedCriterionCode = sel.value;
+      currentData.estabilizacionHighlightedCriterionManual = true;
+      try { saveLocalData(); } catch(e){}
+      refreshEstabilizacionTopSections();
+    });
+  }
+}
+
+function renderEstabilizacionResumenBox() {
+  const stats = computeEstabilizacionStats();
+  if (!stats) return '';
+  const supera = stats.noCumplenEsenciales === 0;
+  const badgeColor = supera ? '#2e7d32' : '#c62828';
+  const badgeText = supera ? 'Supera la evaluación' : 'Pendiente de estándares';
+  const failList = (currentData?.criteria || []).flatMap(cr =>
+    (cr.standards || []).filter(s => {
+      // buscar en fusionado
+      const merged = fusionarCriteriosConEstabilizacion(currentData.criteria, currentData.estabilizacionCriteria || []);
+      for (const mc of merged) {
+        const ms = (mc.standards || []).find(x => x.code === s.code);
+        if (ms && isEssentialStandard(ms) && String(ms.evaluation || '').toLowerCase().includes('no cumple')) return true;
+      }
+      return false;
+    })
+  );
+  const codesStr = formatEssentialCodesList(failList);
+  const essMsg = stats.noCumplenEsenciales === 0
+    ? 'Todos los estándares esenciales se cumplen.'
+    : (stats.noCumplenEsenciales === 1
+        ? `No se ha cumplido <strong>1 estándar esencial</strong> ${codesStr}.`
+        : `No se han cumplido <strong>${stats.noCumplenEsenciales} estándares esenciales</strong> ${codesStr}.`);
+  return `<div class="estab-section">
+    <div class="estab-section-title">Resumen del proceso de estabilización</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+      <span style="display:inline-block;padding:4px 14px;border-radius:20px;font-weight:700;font-size:13px;color:#fff;background:${badgeColor}">${badgeText}</span>
+      <span style="font-size:13px;">${formatPercentValue(stats.percentCumplen)} de los estándares cumplen</span>
+    </div>
+    <div style="font-size:13px;">${essMsg}</div>
+  </div>`;
+}
+
+function renderEstabilizacionHighlightedCriterionBox() {
+  if (!currentData || !currentData.estabilizacionActive) return '';
+  const canUse = canUseHighlightedCriterionEstabilizacion();
+  if (!canUse) {
+    return `<div class="estab-section" style="color:#777;font-size:13px;">Como existen estándares esenciales no cumplidos, no se selecciona un criterio destacado.</div>`;
+  }
+  const autoCode = ensureEstabilizacionHighlightedCriterion();
+  const selectedCode = currentData.estabilizacionHighlightedCriterionManual
+    ? String(currentData.estabilizacionHighlightedCriterionCode || '').trim()
+    : autoCode;
+  const isManual = currentData.estabilizacionHighlightedCriterionManual;
+  const modeText = isManual ? 'Selección manual' : 'Selección automática';
+  const autoCrit = (currentData.criteria || []).find(c => String(c.code || '').trim() === String(autoCode));
+  const selectionHelp = !selectedCode
+    ? 'No se destacará ningún criterio en el informe.'
+    : (selectedCode === autoCode && !isManual)
+      ? 'Puedes cambiarlo manualmente si el evaluador considera que otro criterio debe destacarse.'
+      : (autoCrit ? `El valor actual no coincide con la recomendación automática: ${escapeHtml(displayCriterionTitle(autoCrit.title))}.` : '');
+  const options = (currentData.criteria || []).map(crit => {
+    const code = String(crit.code || '').trim();
+    const title = displayCriterionTitle(crit.title || `Criterio ${code}`);
+    return `<option value="${escapeHtml(code)}" ${code === selectedCode ? 'selected' : ''}>${escapeHtml(title)}</option>`;
+  }).join('');
+  return `<div class="estab-section">
+    <div class="estab-section-title">Criterio destacado (estabilización)</div>
+    <div class="highlight-criterion-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+      <label for="estabilizacionHighlightSelect" style="font-size:13px;font-weight:600;">Criterio destacado</label>
+      <select id="estabilizacionHighlightSelect" class="highlight-criterion-select">
+        <option value="">Ninguno</option>
+        ${options}
+      </select>
+      <span class="highlight-criterion-mode${isManual ? ' manual' : ''}" style="font-size:12px;">${modeText}</span>
+    </div>
+    <div class="highlight-criterion-help" style="font-size:12px;color:#555;">${selectionHelp}</div>
+  </div>`;
+}
+
+// --- Render panel estabilización completo ---
+function renderEstabilizacionStandardCard(std, parentCritCode) {
+  const badgeClass2 = isEssentialStandard(std) ? 'esencial' : 'no-esencial';
+  const badgeLabel = isEssentialStandard(std) ? 'Esencial' : 'No esencial';
+  const evalVal = std.evaluation || 'Cumple';
+  const isCumple = !evalVal.toLowerCase().includes('no cumple') && !evalVal.toLowerCase().includes('no aplica');
+  const isNoCumple = evalVal.toLowerCase().includes('no cumple');
+  const isNoAplica = evalVal.toLowerCase().includes('no aplica');
+
+  const desc = cleanLeadingPunctuation ? cleanLeadingPunctuation(std.description || '') : (std.description || '');
+
+  // Ref box
+  let refHtml = '';
+  if (std.refEvaluation || std.refJustification) {
+    refHtml = `<div class="estab-ref-box">
+      <div class="estab-ref-title">Situación detectada en la evaluación</div>
+      <div><strong>Evaluación:</strong> ${escapeHtml(std.refEvaluation || '')}</div>
+      ${std.refJustification ? `<div><strong>Justificación:</strong> ${escapeHtml(std.refJustification)}</div>` : ''}
+    </div>`;
+  }
+
+  // EOs
+  const eoBlocks = (std.eos || []).map(eo => {
+    const eoEvalVal = eo.evaluation || 'Cumple';
+    const eoCumple = !eoEvalVal.toLowerCase().includes('no cumple') && !eoEvalVal.toLowerCase().includes('no aplica');
+    const eoNoCumple = eoEvalVal.toLowerCase().includes('no cumple');
+    const eoNoAplica = eoEvalVal.toLowerCase().includes('no aplica');
+    return `<div class="eo-item" style="margin-top:8px;border-top:1px solid #e0e0e0;padding-top:8px;">
+      <div class="eo-title-line">
+        <span class="eo-code">Elemento orientativo ${escapeHtml(eo.code || '')}</span>
+        ${eo.essentiality ? `<span class="badge ${badgeClass(eo.essentiality)}">${escapeHtml(eo.essentiality)}</span>` : ''}
+      </div>
+      ${eo.text ? `<div class="eo-text">${escapeHtml(cleanLeadingPunctuation ? cleanLeadingPunctuation(eo.text) : eo.text)}</div>` : ''}
+      ${eo.refEvaluation ? `<div class="estab-ref-box"><div class="estab-ref-title">Situación en evaluación</div><div><strong>Evaluación:</strong> ${escapeHtml(eo.refEvaluation)}</div></div>` : ''}
+      <div class="estab-eval-buttons">
+        <button type="button" class="estab-eval-btn${eoCumple ? ' active-cumple' : ''}" data-estab-eval="${escapeHtml(eo.trackId)}" data-val="Cumple" onclick="handleEstabEval(this)">Cumple</button>
+        <button type="button" class="estab-eval-btn${eoNoCumple ? ' active-nocumple' : ''}" data-estab-eval="${escapeHtml(eo.trackId)}" data-val="No cumple" onclick="handleEstabEval(this)">No cumple</button>
+        <button type="button" class="estab-eval-btn${eoNoAplica ? ' active-noaplica' : ''}" data-estab-eval="${escapeHtml(eo.trackId)}" data-val="No aplica" onclick="handleEstabEval(this)">No aplica</button>
+      </div>
+      ${renderEstabSection('Áreas de mejora', eo.areasMejora, eo.trackId, 'am')}
+      ${renderEstabSection('Fortalezas', eo.fortalezas, eo.trackId, 'fz')}
+    </div>`;
+  }).join('');
+
+  return `<div class="estab-standard-card">
+    <div class="standard-title-wrap">
+      <div class="standard-title-line">
+        <h4 class="standard-heading">Estándar ${escapeHtml((std.code || '').replace(/^Estándar\s*/i,''))}</h4>
+        ${std.essentiality ? `<span class="estab-badge ${badgeClass2}">${escapeHtml(std.essentiality)}</span>` : ''}
+      </div>
+      ${desc ? `<div class="standard-description">${escapeHtml(desc)}</div>` : ''}
+    </div>
+    ${refHtml}
+    <div class="estab-eval-buttons">
+      <button type="button" class="estab-eval-btn${isCumple ? ' active-cumple' : ''}" data-estab-eval="${escapeHtml(std.trackId)}" data-val="Cumple" onclick="handleEstabEval(this)">Cumple</button>
+      <button type="button" class="estab-eval-btn${isNoCumple ? ' active-nocumple' : ''}" data-estab-eval="${escapeHtml(std.trackId)}" data-val="No cumple" onclick="handleEstabEval(this)">No cumple</button>
+      <button type="button" class="estab-eval-btn${isNoAplica ? ' active-noaplica' : ''}" data-estab-eval="${escapeHtml(std.trackId)}" data-val="No aplica" onclick="handleEstabEval(this)">No aplica</button>
+    </div>
+    ${renderEstabSection('Justificación', [std.justification || ''], std.trackId, 'just', true)}
+    ${renderEstabSection('Áreas de mejora', std.areasMejora, std.trackId, 'am')}
+    ${renderEstabSection('Fortalezas', std.fortalezas, std.trackId, 'fz')}
+    ${(std.eos && std.eos.length) ? `<div class="section-title">Elementos orientativos</div>${eoBlocks}` : ''}
+  </div>`;
+}
+
+function renderEstabSection(title, items, trackId, type, isJust) {
+  if (isJust) {
+    return `<div style="margin:6px 0;">
+      <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:2px;">${escapeHtml(title)}</div>
+      <textarea class="justification-textarea estab-text" data-estab-just="${escapeHtml(trackId)}"
+        style="width:100%;min-height:40px;font-size:13px;font-family:inherit;box-sizing:border-box;" oninput="autosizeTextarea(this); syncAndRefreshEstab();">${escapeHtml(items && items[0] ? items[0] : '')}</textarea>
+    </div>`;
+  }
+  const listItems = (items || []).filter(x => String(x||'').trim());
+  const rows = listItems.map(val => `<div class="editable-list-item" style="display:flex;gap:6px;margin-bottom:4px;">
+    <textarea class="editable-list-textarea estab-text" style="flex:1;font-size:13px;min-height:32px;font-family:inherit;box-sizing:border-box;" oninput="autosizeTextarea(this);">${escapeHtml(val)}</textarea>
+    <button type="button" class="editable-list-remove" onclick="removeEstabListItem(this);syncAndRefreshEstab();" style="align-self:flex-start;">✕</button>
+  </div>`).join('');
+  return `<div style="margin:6px 0;" data-estab-${type}="${escapeHtml(trackId)}">
+    <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:2px;">${escapeHtml(title)}</div>
+    ${rows}
+    <button type="button" class="editable-list-add" onclick="addEstabListItem(this, '${escapeHtml(trackId)}','${type}');" style="font-size:13px;color:#2e7d32;cursor:pointer;border:none;background:none;padding:0;">+ Añadir</button>
+  </div>`;
+}
+
+function removeEstabListItem(btn) {
+  const item = btn.closest('.editable-list-item');
+  if (item) item.remove();
+  syncEstabilizacionFromDOM();
+  try { saveLocalData(); } catch(e){}
+}
+
+function addEstabListItem(btn, trackId, type) {
+  const container = btn.closest(`[data-estab-${type}]`);
+  if (!container) return;
+  const newItem = document.createElement('div');
+  newItem.className = 'editable-list-item';
+  newItem.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;';
+  newItem.innerHTML = `<textarea class="editable-list-textarea estab-text" style="flex:1;font-size:13px;min-height:32px;font-family:inherit;box-sizing:border-box;" oninput="autosizeTextarea(this);"></textarea>
+    <button type="button" class="editable-list-remove" onclick="removeEstabListItem(this);syncAndRefreshEstab();" style="align-self:flex-start;">✕</button>`;
+  container.insertBefore(newItem, btn);
+  newItem.querySelector('textarea').focus();
+}
+
+function handleEstabEval(btn) {
+  const trackId = btn.getAttribute('data-estab-eval');
+  const val = btn.getAttribute('data-val');
+  // Actualizar botones del grupo
+  const btns = document.querySelectorAll(`[data-estab-eval="${CSS.escape(trackId)}"]`);
+  btns.forEach(b => {
+    b.classList.remove('active-cumple','active-nocumple','active-noaplica');
+  });
+  const cls = val === 'Cumple' ? 'active-cumple' : val === 'No cumple' ? 'active-nocumple' : 'active-noaplica';
+  btns.forEach(b => { if (b.getAttribute('data-val') === val) b.classList.add(cls); });
+  // Actualizar datos
+  updateEstabilizacionEval(trackId, val);
+  syncAndRefreshEstab();
+}
+
+function updateEstabilizacionEval(trackId, val) {
+  if (!currentData || !currentData.estabilizacionCriteria) return;
+  for (const crit of currentData.estabilizacionCriteria) {
+    for (const std of (crit.standards || [])) {
+      if (std.trackId === trackId) { std.evaluation = val; return; }
+      for (const eo of (std.eos || [])) {
+        if (eo.trackId === trackId) { eo.evaluation = val; return; }
+      }
+    }
+  }
+}
+
+function syncAndRefreshEstab() {
+  syncEstabilizacionFromDOM();
+  try { saveLocalData(); } catch(e){}
+  refreshEstabilizacionTopSections();
+}
+
+function renderEstabilizacionPanel() {
+  const container = document.getElementById('estabilizacionContainer');
+  if (!container || !currentData) return;
+  if (!currentData.estabilizacionActive) {
+    container.innerHTML = `<div class="estab-header">La fase de estabilización no ha comenzado todavía.</div>`;
+    return;
+  }
+  const criteria = currentData.estabilizacionCriteria || [];
+  const startDate = currentData.estabilizacionStartedAt
+    ? new Date(currentData.estabilizacionStartedAt).toLocaleDateString('es-ES') : '';
+
+  const critHtml = criteria.map(crit => {
+    const stds = (crit.standards || []).map(s => renderEstabilizacionStandardCard(s, crit.code)).join('');
+    return `<div class="estab-criterion-section">
+      <div class="estab-criterion-head" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        ▾ ${escapeHtml(displayCriterionTitle(crit.title || `Criterio ${crit.code}`))}
+      </div>
+      <div class="estab-criterion-body">${stds}</div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="estab-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div>
+        <strong>Fase de estabilización iniciada${startDate ? ': ' + startDate : ''}.</strong>
+        Los datos de la Fase de evaluación han quedado bloqueados.
+      </div>
+      <button type="button" class="btn-generate-estab" style="white-space:nowrap;margin-top:0;" onclick="generateEstabilizacionPdf()">Generar Informe de Estabilización</button>
+    </div>
+    <div id="estabilizacionTopSections"></div>
+    ${criteria.length === 0
+      ? '<div class="estab-section" style="color:#777;">No hay estándares pendientes de estabilización.</div>'
+      : critHtml}
+  `;
+  refreshEstabilizacionTopSections();
+  setTimeout(() => {
+    const cont = document.getElementById('estabilizacionContainer');
+    if (cont) {
+      autosizeJustificationTextareas(cont);
+      autosizeEditableList(cont);
+    }
+  }, 50);
+}
+
+// --- Bloquear/desbloquear fase evaluación ---
+function applyEvalLock(locked) {
+  const panel = document.getElementById('phaseTabEvaluacion');
+  if (!panel) return;
+  if (locked) {
+    panel.classList.add('phase-locked');
+    const banner = document.createElement('div');
+    banner.id = 'phaseLockedBanner';
+    banner.className = 'phase-locked-banner';
+    banner.textContent = 'Fase de evaluación bloqueada: se ha iniciado la fase de estabilización del proyecto.';
+    panel.insertBefore(banner, panel.firstChild);
+    const genBtn = document.getElementById('generatePdfBtn');
+    if (genBtn) { genBtn.disabled = true; genBtn.style.opacity = '.4'; }
+    const startBtn = document.getElementById('startEstabilizacionBtn');
+    const activoBtn = document.getElementById('estabilizacionActivoBtn');
+    if (startBtn) startBtn.style.display = 'none';
+    if (activoBtn) activoBtn.style.display = '';
+  } else {
+    panel.classList.remove('phase-locked');
+    const banner = document.getElementById('phaseLockedBanner');
+    if (banner) banner.remove();
+    const startBtn = document.getElementById('startEstabilizacionBtn');
+    const activoBtn = document.getElementById('estabilizacionActivoBtn');
+    if (startBtn) startBtn.style.display = '';
+    if (activoBtn) activoBtn.style.display = 'none';
+  }
+}
+
+// --- Iniciar fase estabilización ---
+async function startEstabilizacionPhase() {
+  if (!currentData) return;
+  const msg = 'Al comenzar la fase de estabilización, el contenido de la Fase de evaluación quedará bloqueado y ya no podrás generar el Informe de Evaluación ni editar sus datos. Se copiarán a la Fase de estabilización todos los estándares que no cumplían, y los que cumplían pero tienen algún elemento orientativo que no cumple. ¿Deseas continuar?';
+  const ok = await customConfirm(msg);
+  if (!ok) return;
+  currentData.estabilizacionActive = true;
+  currentData.estabilizacionStartedAt = new Date().toISOString();
+  currentData.estabilizacionCriteria = buildEstabilizacionCriteria(currentData.criteria || []);
+  currentData.estabilizacionHighlightedCriterionCode = '';
+  currentData.estabilizacionHighlightedCriterionManual = false;
+  applyEvalLock(true);
+  renderEstabilizacionPanel();
+  switchPhaseTab('estabilizacion');
+  try { saveLocalData(); } catch(e){}
+}
+
+// --- Generar PDF de estabilización ---
+async function generateEstabilizacionPdf() {
+  if (!currentData || !currentData.estabilizacionActive) return;
+  // Guardar originales
+  const origCriteria = currentData.criteria;
+  const origOutcome = currentData.evaluationOutcome;
+  const origHlCode = currentData.highlightedCriterionCode;
+  const origHlManual = currentData.highlightedCriterionManual;
+
+  // Calcular esenciales fallidos ANTES de fusionar (para el texto del PDF)
+  const failedEssentialsBefore = (origCriteria || []).flatMap(cr =>
+    (cr.standards || []).filter(s => isEssentialStandard(s) && stdEvalFails(s))
+  );
+  const failedCodes = failedEssentialsBefore.map(s => String(s.code || '').trim()).filter(Boolean);
+
+  try {
+    await ensureRequiredLibraries();
+    // Fusionar
+    currentData.criteria = fusionarCriteriosConEstabilizacion(origCriteria, currentData.estabilizacionCriteria || []);
+    // Recalcular outcome
+    const mergedStats = computeSummaryStats(currentData);
+    currentData.evaluationOutcome = mergedStats.noCumplenEsenciales === 0 ? 'Supera la evaluación' : 'Pendiente de estándares';
+    // Criterio destacado de estabilización
+    currentData.highlightedCriterionCode = currentData.estabilizacionHighlightedCriterionCode || '';
+    currentData.highlightedCriterionManual = currentData.estabilizacionHighlightedCriterionManual || false;
+    // Generar PDF con modo estabilización
+    await generateCoverPdf('estabilizacion', { failedCodes });
+  } finally {
+    // Restaurar siempre
+    currentData.criteria = origCriteria;
+    currentData.evaluationOutcome = origOutcome;
+    currentData.highlightedCriterionCode = origHlCode;
+    currentData.highlightedCriterionManual = origHlManual;
+  }
+}
+
+// --- downloadDocConvertScript ---
+function downloadDocConvertScript(target) {
+  let filename, mime, text;
+  if (target === 'windows') {
+    filename = 'convertir_doc_a_docx.bat';
+    mime = 'application/octet-stream';
+    text = [
+      '@echo off','chcp 65001 >nul','setlocal enabledelayedexpansion','',
+      'set "LO="',
+      'for %%P in (',
+      '  "%ProgramFiles%\\LibreOffice\\program\\soffice.exe"',
+      '  "%ProgramFiles(x86)%\\LibreOffice\\program\\soffice.exe"',
+      ') do if exist %%P set "LO=%%~P"','',
+      'if "%LO%"=="" (',
+      '  echo LibreOffice no encontrado. Descárgalo gratis en https://www.libreoffice.org',
+      '  pause & exit /b 1',')','',
+      'if "%~1"=="" (',
+      '  set /p "RESP=Convertir todos los .doc de esta carpeta? (S/N): "',
+      '  if /i "!RESP!"=="S" (',
+      '    for %%F in (*.doc) do "%LO%" --headless --convert-to docx "%%F"',
+      '  )',') else (',
+      '  for %%F in (%*) do "%LO%" --headless --convert-to docx "%%F"',
+      ')','echo Listo.','pause'
+    ].join('\r\n');
+  } else {
+    filename = 'convertir_doc_a_docx.sh';
+    mime = 'application/octet-stream';
+    text = [
+      '#!/bin/bash','',
+      'LO=""',
+      'for P in "/Applications/LibreOffice.app/Contents/MacOS/soffice" "/usr/bin/soffice" "/usr/local/bin/soffice"; do',
+      '  [ -x "$P" ] && LO="$P" && break','done','',
+      'if [ -z "$LO" ]; then',
+      '  echo "LibreOffice no encontrado. Descárgalo en https://www.libreoffice.org"',
+      '  exit 1','fi','',
+      'if [ $# -eq 0 ]; then',
+      '  read -p "Convertir todos los .doc de esta carpeta? (s/n): " resp',
+      '  [[ "$resp" =~ ^[sS]$ ]] && for f in *.doc; do "$LO" --headless --convert-to docx "$f"; done',
+      'else','  for f in "$@"; do "$LO" --headless --convert-to docx "$f"; done','fi',
+      'echo "Listo."'
+    ].join('\n');
+  }
+  const blob = new Blob([text], { type: mime });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 </script>
 
 
