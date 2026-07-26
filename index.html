@@ -1073,8 +1073,8 @@
     .btn-generate-estab:disabled{background:#aaa;cursor:not-allowed}
     .estab-criterion-section{border:1px solid #c8e6c9;border-radius:7px;margin-bottom:12px;overflow:hidden}
     .estab-criterion-head{background:#e8f5e9;padding:10px 14px;font-weight:700;color:#1b5e20;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none}
-    .estab-criterion-body{padding:12px 14px}
-    .estab-standard-card{border:1px solid #c8e6c9;border-radius:6px;padding:12px;margin-bottom:10px;background:#fafffe}
+    .estab-criterion-body{padding:12px 14px;font-size:15px}
+    .estab-standard-card{border:1px solid #c8e6c9;border-radius:6px;padding:12px;margin-bottom:10px;background:#fafffe;font-size:15px}
     /* Modal confirmación */
     .custom-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center}
     .custom-modal-card{background:#fff;border-radius:10px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden}
@@ -1121,7 +1121,7 @@
     </div>
     <div class="app-header-center">
       <div class="app-header-title">Gestor de informes</div>
-      <div class="app-header-subtitle">Centros comprometidos contra la violencia de género <span style="font-size:12px;color:#888;margin-left:8px;">v1.14</span></div>
+      <div class="app-header-subtitle">Centros comprometidos contra la violencia de género <span style="font-size:12px;color:#888;margin-left:8px;">v1.20</span></div>
     </div>
     <div class="app-header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
       <div id="userNameDisplay" style="font-size:12px;color:#666;text-align:right;min-height:16px;width:100%;"></div>
@@ -2688,7 +2688,7 @@ async function generateCoverPdf(mode='evaluacion', pdfContext={}) {
     doc.addImage(logoPortada.dataUrl, 'PNG', (pageW - fit.w)/2, 42, fit.w, fit.h);
   }
 
-  let textStartY = 145;
+  let textStartY = mode === 'estabilizacion' ? 125 : 145;
   const lineGap = 14;
 
   doc.setFont('helvetica','normal');
@@ -2710,16 +2710,20 @@ async function generateCoverPdf(mode='evaluacion', pdfContext={}) {
     doc.text(pdfCode, pageW/2, textStartY + lineGap, {align:'center'});
   }
 
+  let centerEndY = textStartY + lineGap * 2;
   if (pdfCenter) {
     doc.setFont('helvetica','bold');
     doc.setFontSize(16);
     doc.setTextColor(118,65,162);
-    doc.text(pdfCenter, pageW/2, textStartY + (lineGap * 2), {align:'center'});
+    const centerLines = doc.splitTextToSize(pdfCenter, pageW - margin * 2);
+    doc.text(centerLines, pageW/2, centerEndY, {align:'center'});
+    centerEndY += (centerLines.length - 1) * lineGap;
   }
 
   if (logoPacto) {
     const fitMid = fitBox(logoPacto.width, logoPacto.height, 22, 14);
-    doc.addImage(logoPacto.dataUrl, 'PNG', (pageW - fitMid.w)/2, 210, fitMid.w, fitMid.h);
+    const logoY = Math.max(centerEndY + 12, 210);
+    doc.addImage(logoPacto.dataUrl, 'PNG', (pageW - fitMid.w)/2, logoY, fitMid.w, fitMid.h);
   }
 
   drawLowerLogos();
@@ -4170,22 +4174,51 @@ function renderEvaluationTable(item) {
 
 function renderSection(title, items=[], codePrefix='') {
   const key = title.toLowerCase().includes('fortaleza') ? 'fortalezas' : 'areasMejora';
+  const safeItems = items.length ? items : [''];
+  const listHtml = safeItems.map((x, idx) => `<textarea class="editable-list-item" data-section-key="${key}" data-parent-code="${escapeHtml(codePrefix || '')}" data-item-index="${idx}" placeholder="No se han descrito ${title.toLowerCase()}.">${escapeHtml(x)}</textarea>`).join('');
   return `
     <div class="section-title">${title}</div>
-    ${items.length
-      ? `<div class="editable-list">${items.map((x, idx) => `<textarea class="editable-list-item" data-section-key="${key}" data-parent-code="${escapeHtml(codePrefix || '')}" data-item-index="${idx}">${escapeHtml(x)}</textarea>`).join('')}</div>`
-      : `<div class="muted small">No se han descrito ${title.toLowerCase()}.</div>`
-    }
+    <div class="editable-list" data-section-key="${key}" data-parent-code="${escapeHtml(codePrefix || '')}">${listHtml}
+      <button type="button" class="editable-list-add" onclick="addEditableListItem(this)" style="font-size:13px;color:#1976d2;cursor:pointer;border:none;background:none;padding:2px 0;">+ Añadir</button>
+    </div>
   `;
+}
+
+function addEditableListItem(btn) {
+  const container = btn.parentElement;
+  const key = container.getAttribute('data-section-key');
+  const codePrefix = container.getAttribute('data-parent-code') || '';
+  const existing = container.querySelectorAll('.editable-list-item');
+  const idx = existing.length;
+  const ta = document.createElement('textarea');
+  ta.className = 'editable-list-item';
+  ta.setAttribute('data-section-key', key);
+  ta.setAttribute('data-parent-code', codePrefix);
+  ta.setAttribute('data-item-index', String(idx));
+  ta.placeholder = '';
+  container.insertBefore(ta, btn);
+  ta.focus();
+  autosizeTextarea(ta);
 }
 
 
 
+function autosizeTextarea(ta) {
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.overflowY = 'hidden';
+  ta.style.height = Math.max(36, ta.scrollHeight + 2) + 'px';
+}
+
 function autosizeJustificationTextareas(root=document) {
-  root.querySelectorAll('.justification-input').forEach((ta) => {
-    ta.style.height = 'auto';
-    ta.style.overflowY = 'hidden';
-    ta.style.height = Math.max(44, ta.scrollHeight + 2) + 'px';
+  root.querySelectorAll('.justification-input, .justification-textarea, .editable-list-textarea').forEach(ta => {
+    autosizeTextarea(ta);
+  });
+}
+
+function autosizeEditableList(root=document) {
+  root.querySelectorAll('.editable-list-item textarea').forEach(ta => {
+    autosizeTextarea(ta);
   });
 }
 
@@ -4216,13 +4249,7 @@ function updateArrayItemByCode(code, key, index, value) {
   return false;
 }
 
-function autosizeEditableList(root=document) {
-  root.querySelectorAll('.editable-list-item').forEach((ta) => {
-    ta.style.height = 'auto';
-    ta.style.overflowY = 'hidden';
-    ta.style.height = Math.max(44, ta.scrollHeight + 2) + 'px';
-  });
-}
+
 
 
 function updateJustificationByCode(code, value) {
@@ -4372,14 +4399,22 @@ function switchPhaseTab(tab) {
   estabPanel.classList.toggle('active', !isEval);
   if (evalBtn) evalBtn.classList.toggle('active', isEval);
   if (estabBtn) estabBtn.classList.toggle('active', !isEval);
-  if (!isEval) {
-    // Recalcular autosize al mostrar
+  if (isEval) {
+    setTimeout(() => {
+      const report = document.getElementById('report');
+      if (report) { autosizeJustificationTextareas(report); autosizeEditableList(report); }
+    }, 50);
+  } else {
+    const container = document.getElementById('estabilizacionContainer');
+    if (container && (!currentData || !currentData.estabilizacionActive)) {
+      container.innerHTML = `<div class="estab-header" style="color:#555;background:#f5f5f5;border-color:#ccc;">
+        <strong>Fase de estabilización</strong><br>
+        Todavía no se ha iniciado la fase de estabilización de este proyecto. Pulsa «Comenzar estabilización» en la pestaña <em>Fase de evaluación</em> cuando el informe de evaluación esté finalizado.
+      </div>`;
+    }
     setTimeout(() => {
       const cont = document.getElementById('estabilizacionContainer');
-      if (cont) {
-        autosizeJustificationTextareas(cont);
-        autosizeEditableList(cont);
-      }
+      if (cont) { autosizeJustificationTextareas(cont); autosizeEditableList(cont); }
     }, 50);
   }
 }
@@ -4763,7 +4798,10 @@ function renderEstabilizacionPanel() {
   const container = document.getElementById('estabilizacionContainer');
   if (!container || !currentData) return;
   if (!currentData.estabilizacionActive) {
-    container.innerHTML = `<div class="estab-header">La fase de estabilización no ha comenzado todavía.</div>`;
+    container.innerHTML = `<div class="estab-header" style="color:#555;background:#f5f5f5;border-color:#ccc;">
+      <strong>Fase de estabilización</strong><br>
+      Todavía no se ha iniciado la fase de estabilización de este proyecto. Pulsa «Comenzar estabilización» en la pestaña <em>Fase de evaluación</em> cuando el informe de evaluación esté finalizado.
+    </div>`;
     return;
   }
   const criteria = currentData.estabilizacionCriteria || [];
